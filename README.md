@@ -2,6 +2,8 @@
 
 A fast, ad-free "liquid glass" home screen for Google TV and Android TV boxes. No root. Nothing on your TV gets turned off.
 
+![WLH Glass home screen](docs/screenshot.jpg)
+
 Built and tested on an **onn. Full HD Streaming Device** (Google TV, Android 14). It should work on other Google TV / Android TV boxes running Android 9 or newer.
 
 ## What you get
