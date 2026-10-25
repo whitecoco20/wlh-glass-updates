@@ -9,6 +9,7 @@ Built and tested on an **onn. Full HD Streaming Device** (Google TV, Android 14)
 ## What you get
 
 - **Your apps, no ads.** A glass row of 8 favorite apps with their real icons, plus an All apps screen. No sponsored rows, no trailers.
+- **24-hour clock.** Default is 24-hour. Change it in Settings › Clock format (24-hour, 12-hour, or follow the TV).
 - **Live weather.** Current temperature, feels-like, high/low and a 3-day forecast (Open-Meteo, no account needed). US cities also show National Weather Service alerts.
 - **Your own backgrounds.** A built-in sunset scene, plus any photos you drop in a folder on the TV. Flip with one button or rotate every 15 minutes.
 - **Home button takeover.** An optional switch makes the remote's Home button and power-on open WLH Glass. Turn it off any time to get Google TV back.
@@ -17,11 +18,24 @@ Built and tested on an **onn. Full HD Streaming Device** (Google TV, Android 14)
 - **Auto-update.** Settings › App update finds and installs new versions (you confirm on screen).
 - **Light.** About 35–45 MB of memory. Low power mode turns the blur off.
 
+## Compatibility
+
+| Device | Status |
+|---|---|
+| onn. Full HD Streaming Device (Google TV, Android 14) | Tested, works |
+| Other Google TV devices (Chromecast with Google TV, onn 4K, TCL/Hisense/Sony Google TV sets) | Should work (Android 9+) |
+| Android TV boxes (Nvidia Shield, Xiaomi Mi Box, generic Android TV) | Should work. Some let you pick WLH Glass as the default home directly |
+| Fire TV, Roku, Samsung Tizen, LG webOS, Apple TV | Not supported (not Android TV) |
+
+Requires Android 9 or newer for the sleep timer. The home screen itself runs on Android 6+.
+
+Tried it on another device? Open an issue with the model, Android version and what worked.
+
 ## Install (no PC needed)
 
 1. On the TV, install **Downloader** (by AFTVnews) from the Play Store.
 2. In Downloader, open this link and install:
-   `https://raw.githubusercontent.com/whitecoco20/wlh-glass-updates/main/releases/wlh-glass-1.7.apk`
+   `https://raw.githubusercontent.com/whitecoco20/wlh-glass-updates/main/releases/wlh-glass-1.8.apk`
    Allow Downloader to install apps when Android asks. If Play Protect warns you, choose **Install anyway**.
 3. Open **WLH Glass** from your apps.
 

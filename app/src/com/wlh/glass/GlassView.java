@@ -75,6 +75,9 @@ public class GlassView extends View {
     String[] fDay = new String[3], fHi = new String[3], fLo = new String[3]; int[] fCode = { -1, -1, -1 };
     // Backgrounds: built-in "Sunset" plus any .jpg/.png/.webp you put in
     // /sdcard/Android/data/com.wlh.glass/files/backgrounds/ (adb push, or a file manager).
+    // Clock: 0 = 24-hour (default), 1 = 12-hour, 2 = follow the TV's setting
+    int clockMode;
+    boolean use24() { return clockMode == 0 || (clockMode == 2 && DateFormat.is24HourFormat(getContext())); }
     static final int ROTATE = 999;
     java.io.File[] bgFiles = new java.io.File[0];
     int bgMode, bgIdx; // bgMode: index of a fixed picture, or ROTATE
@@ -155,6 +158,7 @@ public class GlassView extends View {
         celsius = prefs.getBoolean("celsius", false);
         city = Math.max(0, Math.min(CITY_NAME.length - 1, prefs.getInt("city", 0)));
         bootStart = prefs.getBoolean("bootStart", true);
+        clockMode = prefs.getInt("clock", 0);
         bgMode = prefs.getInt("bgMode", 0);
         if (bgMode != ROTATE && bgMode > 50) bgMode = 0;
         bgIdx = bgMode == ROTATE ? prefs.getInt("bgIdx", 0) : bgMode;
@@ -330,7 +334,7 @@ public class GlassView extends View {
                     if (end.length() >= 16) {
                         try {
                             Date d = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.US).parse(end);
-                            a += " until " + new SimpleDateFormat(DateFormat.is24HourFormat(getContext()) ? "EEE HH:mm" : "EEE h a", Locale.getDefault()).format(d);
+                            a += " until " + new SimpleDateFormat(use24() ? "EEE HH:mm" : "EEE h a", Locale.getDefault()).format(d);
                         } catch (Throwable ignored) { }
                     }
                     if (f.length() > 1) a += "  (+" + (f.length() - 1) + " more)";
@@ -572,7 +576,7 @@ public class GlassView extends View {
         if (row > allScroll + 2) allScroll = row - 2;
     }
 
-    static final String[] SET_LABELS = { "Home button", "Background", "Low power mode", "Glass blur", "Temperature", "Weather city", "Open when TV starts", "App update", "Android TV settings" };
+    static final String[] SET_LABELS = { "Home button", "Background", "Clock format", "Low power mode", "Glass blur", "Temperature", "Weather city", "Open when TV starts", "App update", "Android TV settings" };
     void settingsKey(boolean ok, boolean back, int dx, int dy) {
         if (back) { showSettings = false; return; }
         if (dy != 0) { setIdx = clamp(setIdx + dy, 0, SET_LABELS.length - 1); return; }
@@ -583,13 +587,14 @@ public class GlassView extends View {
             case 0: if (ok) { if (homeServiceOn() && HomeKeyService.switchToGoogleTv(getContext())) showSettings = false; else start(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)); } break;
             case 1: { scanBackgrounds(); int n = bgCount() + 1, cur = bgMode == ROTATE ? n - 1 : bgMode; cur = (cur + step + n) % n;
                       bgMode = cur == n - 1 ? ROTATE : cur; if (bgMode != ROTATE) bgIdx = bgMode; e.putInt("bgMode", bgMode).putInt("bgIdx", bgIdx); dropBitmaps(); break; }
-            case 2: lowPower = !lowPower; e.putBoolean("lowPower", lowPower); dropBitmaps(); break;
-            case 3: blurLevel = (blurLevel + step + 3) % 3; e.putInt("blur", blurLevel); dropBitmaps(); break;
-            case 4: celsius = !celsius; e.putBoolean("celsius", celsius); clearWeather(); fetchWeather(); break;
-            case 5: city = (city + step + CITY_NAME.length) % CITY_NAME.length; e.putInt("city", city); clearWeather(); fetchWeather(); break;
-            case 6: bootStart = !bootStart; e.putBoolean("bootStart", bootStart); break;
-            case 7: if (ok) { if (updater.updateReady()) updater.install(); else updater.check(); } break;
-            case 8: if (ok) start(new Intent(Settings.ACTION_SETTINGS)); break;
+            case 2: clockMode = (clockMode + step + 3) % 3; e.putInt("clock", clockMode); break;
+            case 3: lowPower = !lowPower; e.putBoolean("lowPower", lowPower); dropBitmaps(); break;
+            case 4: blurLevel = (blurLevel + step + 3) % 3; e.putInt("blur", blurLevel); dropBitmaps(); break;
+            case 5: celsius = !celsius; e.putBoolean("celsius", celsius); clearWeather(); fetchWeather(); break;
+            case 6: city = (city + step + CITY_NAME.length) % CITY_NAME.length; e.putInt("city", city); clearWeather(); fetchWeather(); break;
+            case 7: bootStart = !bootStart; e.putBoolean("bootStart", bootStart); break;
+            case 8: if (ok) { if (updater.updateReady()) updater.install(); else updater.check(); } break;
+            case 9: if (ok) start(new Intent(Settings.ACTION_SETTINGS)); break;
         }
         e.apply();
     }
@@ -598,12 +603,13 @@ public class GlassView extends View {
         switch (i) {
             case 0: return homeServiceOn() ? "WLH Glass — OK switches to Google TV" : "Google TV — OK, then turn on WLH Glass Home button";
             case 1: return bgMode != ROTATE ? bgName(bgMode) : "Rotate every 15 min (now " + bgName(bgIdx) + ")";
-            case 2: return lowPower ? "On" : "Off";
-            case 3: return blurLevel == 0 ? "Light" : blurLevel == 1 ? "Medium" : "Strong";
-            case 4: return celsius ? "°C" : "°F";
-            case 5: return CITY_NAME[city];
-            case 6: return bootStart ? "On" : "Off";
-            case 7: {
+            case 2: return clockMode == 0 ? "24-hour" : clockMode == 1 ? "12-hour" : "Follow TV (" + (DateFormat.is24HourFormat(getContext()) ? "24-hour" : "12-hour") + ")";
+            case 3: return lowPower ? "On" : "Off";
+            case 4: return blurLevel == 0 ? "Light" : blurLevel == 1 ? "Medium" : "Strong";
+            case 5: return celsius ? "°C" : "°F";
+            case 6: return CITY_NAME[city];
+            case 7: return bootStart ? "On" : "Off";
+            case 8: {
                 if (updater.state.length() > 0) return updater.state;
                 if (updater.updateReady()) return "Version " + updater.latestName() + " ready — OK to install";
                 return "Up to date (" + updater.myName() + ") — OK to check";
@@ -821,7 +827,7 @@ public class GlassView extends View {
 
         // clock
         Date now = new Date();
-        boolean h24 = DateFormat.is24HourFormat(getContext());
+        boolean h24 = use24();
         text(c, new SimpleDateFormat(h24 ? "HH:mm" : "h:mm", Locale.getDefault()).format(now), 72, 140, 88, light, Color.WHITE, Paint.Align.LEFT);
         text(c, new SimpleDateFormat("EEEE, MMMM d", Locale.getDefault()).format(now), 74, 184, 26, reg, 0xD1FFFFFF, Paint.Align.LEFT);
 
@@ -946,7 +952,7 @@ public class GlassView extends View {
         long min = System.currentTimeMillis() / 60000;
         float ox = 120 + (min % 7) * 40, oy = 620 + (min % 5) * 30; // drift slowly
         Date now = new Date();
-        boolean h24 = DateFormat.is24HourFormat(getContext());
+        boolean h24 = use24();
         glass(c, ox - 40, oy - 230, 760, 330, 48, true);
         text(c, new SimpleDateFormat(h24 ? "HH:mm" : "h:mm", Locale.getDefault()).format(now), ox, oy - 40, 160, light, Color.WHITE, Paint.Align.LEFT);
         String line = new SimpleDateFormat("EEEE, MMMM d", Locale.getDefault()).format(now);
@@ -1039,10 +1045,10 @@ public class GlassView extends View {
         text(c, "WLH Glass settings", 520, 200, 40, bold, Color.WHITE, Paint.Align.LEFT);
         text(c, "OK or ← → to change  ·  Back to close", 1400, 200, 20, reg, 0xCCFFFFFF, Paint.Align.RIGHT);
         for (int i = 0; i < SET_LABELS.length; i++) {
-            float y = 240 + i * 76;
-            if (i == setIdx) { p.setColor(0x2EFFFFFF); r.set(500, y, 1420, y + 64); c.drawRoundRect(r, 22, 22, p); focusRing(c, 500, y, 920, 64, 22); }
-            text(c, SET_LABELS[i], 540, y + 42, 25, med, Color.WHITE, Paint.Align.LEFT);
-            text(c, setValue(i), 1384, y + 42, 22, reg, 0xE0FFFFFF, Paint.Align.RIGHT);
+            float y = 238 + i * 70;
+            if (i == setIdx) { p.setColor(0x2EFFFFFF); r.set(500, y, 1420, y + 60); c.drawRoundRect(r, 20, 20, p); focusRing(c, 500, y, 920, 60, 20); }
+            text(c, SET_LABELS[i], 540, y + 40, 24, med, Color.WHITE, Paint.Align.LEFT);
+            text(c, setValue(i), 1384, y + 40, 22, reg, 0xE0FFFFFF, Paint.Align.RIGHT);
         }
     }
 }
