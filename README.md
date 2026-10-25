@@ -8,9 +8,9 @@ Built and tested on an **onn. Full HD Streaming Device** (Google TV, Android 14)
 
 ## What you get
 
-- **Your apps, no ads.** A glass row of 8 favorite apps with their real icons, plus an All apps screen. No sponsored rows, no trailers.
+- **Your apps, no ads.** A glass row of up to 8 favorite apps with their real icons, plus an All apps screen. Pick and order them with the remote in Settings › Favorites. No sponsored rows, no trailers.
 - **24-hour clock.** Default is 24-hour. Change it in Settings › Clock format (24-hour, 12-hour, or follow the TV).
-- **Live weather.** Current temperature, feels-like, high/low and a 3-day forecast (Open-Meteo, no account needed). US cities also show National Weather Service alerts.
+- **Live weather, anywhere.** Type any city or country in Settings › Weather location (a country uses its capital). Current temperature, feels-like, high/low and a 3-day forecast (Open-Meteo, no account needed). US locations also show National Weather Service alerts.
 - **Your own backgrounds.** A built-in sunset scene, plus any photos you drop in a folder on the TV. Flip with one button or rotate every 15 minutes.
 - **Home button takeover.** An optional switch makes the remote's Home button and power-on open WLH Glass. Turn it off any time to get Google TV back.
 - **Sleep timer.** 15 to 120 minutes, keeps counting while you watch other apps.
@@ -35,7 +35,7 @@ Tried it on another device? Open an issue with the model, Android version and wh
 
 1. On the TV, install **Downloader** (by AFTVnews) from the Play Store.
 2. In Downloader, open this link and install:
-   `https://raw.githubusercontent.com/whitecoco20/wlh-glass-updates/main/releases/wlh-glass-1.8.apk`
+   `https://raw.githubusercontent.com/whitecoco20/wlh-glass-updates/main/releases/wlh-glass-1.9.apk`
    Allow Downloader to install apps when Android asks. If Play Protect warns you, choose **Install anyway**.
 3. Open **WLH Glass** from your apps.
 
@@ -91,8 +91,8 @@ Back to Google's: `adb shell settings put secure screensaver_components com.goog
 
 ## Customize
 
-- **Favorites:** edit `FAV_PKGS` (and `FAV_BLURB`) in `app/src/com/wlh/glass/GlassView.java`. If fewer than 8 are installed, the row fills from your other apps.
-- **Weather cities:** `CITY_NAME`, `CITY_LAT`, `CITY_LON` in the same file.
+- **Favorites:** pick them on the TV in Settings › Favorites. The out-of-the-box list is `FAV_PKGS` (and `FAV_BLURB`) in `app/src/com/wlh/glass/GlassView.java`; if fewer than 8 of those are installed, the row fills from your other apps.
+- **Weather location:** set on the TV in Settings › Weather location. Lookup uses Open-Meteo geocoding and, for countries, [REST Countries](https://restcountries.com) for the capital.
 - **Update feed for your fork:** change `FEED` in `Updater.java` to your repo's `version.json`.
 
 ## Build it yourself

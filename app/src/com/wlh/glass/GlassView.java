@@ -70,7 +70,12 @@ public class GlassView extends View {
     int allIdx = 0, allScroll = 0, setIdx = 0;
     float[] lift = new float[16];
 
-    boolean lowPower; int blurLevel; boolean celsius; int city; boolean bootStart;
+    boolean lowPower; int blurLevel; boolean celsius; boolean bootStart;
+    // Weather location: any city or country the viewer types in (Open-Meteo geocoding).
+    String placeName; double placeLat, placeLon; String placeCC; int placeGen = 0;
+    // Favorites: picked on the TV (Settings > Favorites). Empty = defaults below + auto-fill.
+    final List<String> favPkgs = new ArrayList<String>(); boolean favCustom = false;
+    boolean pickMode = false;
     String wTemp = null, wFeels = "", wCond = "Loading weather…", wHiLo = ""; int wCode = -1; long wAt = 0; boolean wStale = false; boolean wBusy = false;
     String[] fDay = new String[3], fHi = new String[3], fLo = new String[3]; int[] fCode = { -1, -1, -1 };
     // Backgrounds: built-in "Sunset" plus any .jpg/.png/.webp you put in
@@ -156,7 +161,8 @@ public class GlassView extends View {
         lowPower = prefs.getBoolean("lowPower", false);
         blurLevel = prefs.getInt("blur", 1);
         celsius = prefs.getBoolean("celsius", false);
-        city = Math.max(0, Math.min(CITY_NAME.length - 1, prefs.getInt("city", 0)));
+        loadPlace();
+        loadFavList();
         bootStart = prefs.getBoolean("bootStart", true);
         clockMode = prefs.getInt("clock", 0);
         bgMode = prefs.getInt("bgMode", 0);
@@ -188,7 +194,38 @@ public class GlassView extends View {
         if (level >= 20) { for (App a : all) if (!isFav(a.pkg)) a.icon = null; }
         if (level >= 20 && !isShown()) dropBitmaps();
     }
-    boolean isFav(String pkg) { for (String f : FAV_PKGS) if (f.equals(pkg)) return true; return false; }
+    boolean isFav(String pkg) { for (App f : favs) if (f.pkg.equals(pkg)) return true; return false; }
+
+    void loadFavList() {
+        favPkgs.clear();
+        String s = prefs.getString("favs", "");
+        for (String x : s.split(",")) if (x.trim().length() > 0) favPkgs.add(x.trim());
+        favCustom = !favPkgs.isEmpty();
+        if (!favCustom) for (String x : FAV_PKGS) favPkgs.add(x);
+    }
+    void saveFavList() {
+        StringBuilder b = new StringBuilder();
+        for (String x : favPkgs) { if (b.length() > 0) b.append(','); b.append(x); }
+        prefs.edit().putString("favs", b.toString()).apply();
+        favCustom = !favPkgs.isEmpty();
+        if (!favCustom) loadFavList();
+    }
+    void openPicker() {
+        // Start from what is on the row now, so the picker shows the current favorites ticked.
+        favPkgs.clear(); for (App f : favs) favPkgs.add(f.pkg);
+        showSettings = false; pickMode = true; showAll = true; allIdx = 0; allScroll = 0;
+    }
+    void togglePick(String pkg) {
+        if (favPkgs.remove(pkg)) return;
+        if (favPkgs.size() >= 8) { flash("You already have 8. Remove one first."); return; }
+        favPkgs.add(pkg);
+    }
+    void finishPicker() {
+        pickMode = false; showAll = false;
+        if (favPkgs.isEmpty()) { prefs.edit().remove("favs").apply(); loadFavList(); flash("Favorites reset to default"); }
+        else { saveFavList(); flash("Favorites saved (" + favPkgs.size() + ")"); }
+        loadApps(); appIdx = 0;
+    }
 
     void scheduleTick() {
         ui.removeCallbacks(tick);
@@ -207,7 +244,7 @@ public class GlassView extends View {
     void loadApps() {
         PackageManager pm = getContext().getPackageManager();
         favs.clear();
-        for (String pkg : FAV_PKGS) {
+        for (String pkg : favPkgs) {
             App a = app(pm, pkg, true);
             if (a != null) favs.add(a);
         }
@@ -229,7 +266,7 @@ public class GlassView extends View {
         });
         // Fewer than 8 of the listed favorites installed (e.g. someone else's TV)? Fill the row from the app list.
         for (App a : all) {
-            if (favs.size() >= 8) break;
+            if (favCustom || favs.size() >= 8) break;
             boolean have = false; for (App f : favs) if (f.pkg.equals(a.pkg)) { have = true; break; }
             if (!have && !a.pkg.startsWith("com.android.") && !a.pkg.equals("com.google.android.tv.remote.service")) { App f = new App(); f.pkg = a.pkg; f.label = a.label; f.icon = loadIcon(pm, safeInfo(pm, a.pkg)); favs.add(f); }
         }
@@ -282,15 +319,141 @@ public class GlassView extends View {
         } catch (Throwable t) { }
     }
 
+    // ---------- weather location ----------
+    void loadPlace() {
+        placeName = prefs.getString("placeName", null);
+        if (placeName != null) {
+            placeLat = Double.longBitsToDouble(prefs.getLong("placeLat", 0));
+            placeLon = Double.longBitsToDouble(prefs.getLong("placeLon", 0));
+            placeCC = prefs.getString("placeCC", "");
+        } else {
+            // Older versions stored an index into a fixed city list.
+            int i = Math.max(0, Math.min(CITY_NAME.length - 1, prefs.getInt("city", 0)));
+            placeName = CITY_NAME[i]; placeLat = CITY_LAT[i]; placeLon = CITY_LON[i];
+            placeCC = i < 7 ? "US" : i < 9 ? "CO" : "MX";
+        }
+    }
+    void setPlace(String name, double lat, double lon, String cc) {
+        placeName = name; placeLat = lat; placeLon = lon; placeCC = cc == null ? "" : cc; placeGen++;
+        prefs.edit().putString("placeName", name).putLong("placeLat", Double.doubleToLongBits(lat))
+                .putLong("placeLon", Double.doubleToLongBits(lon)).putString("placeCC", placeCC).apply();
+        wAlert = null; clearWeather(); fetchWeather();
+        flash("Weather: " + name);
+        invalidate();
+    }
+    String placeKey() { return placeName + "|" + placeLat + "|" + placeLon; }
+    String placeShort() { String n = placeName == null ? "" : placeName; return n.length() > 18 ? n.substring(0, 17) + "…" : n; }
+
+    static class Place { String label, name, cc; double lat, lon; }
+
+    /** Opens the TV keyboard; the viewer types a city or a country, then picks from the matches. */
+    void askPlace() {
+        if (!(getContext() instanceof android.app.Activity)) return;
+        final android.widget.EditText in = new android.widget.EditText(getContext());
+        in.setSingleLine(true);
+        in.setHint("City or country, e.g. Paris or Japan");
+        in.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH);
+        in.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_FLAG_CAP_WORDS);
+        int pad = (int) (24 * getResources().getDisplayMetrics().density);
+        android.widget.FrameLayout box = new android.widget.FrameLayout(getContext());
+        box.setPadding(pad, pad / 2, pad, 0); box.addView(in);
+        final android.app.AlertDialog d = new android.app.AlertDialog.Builder(getContext(), android.R.style.Theme_DeviceDefault_Dialog_Alert)
+                .setTitle("Weather location").setView(box)
+                .setPositiveButton("Search", null).setNegativeButton("Cancel", null).create();
+        final Runnable go = new Runnable() { public void run() {
+            String q = in.getText().toString().trim();
+            if (q.length() < 2) return;
+            d.dismiss(); searchPlace(q);
+        } };
+        in.setOnEditorActionListener(new android.widget.TextView.OnEditorActionListener() {
+            public boolean onEditorAction(android.widget.TextView v, int a, KeyEvent e) { go.run(); return true; } });
+        d.setOnShowListener(new android.content.DialogInterface.OnShowListener() { public void onShow(android.content.DialogInterface di) {
+            d.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener(new View.OnClickListener() { public void onClick(View v) { go.run(); } });
+            in.requestFocus();
+        } });
+        d.getWindow().setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);
+        d.show();
+    }
+
+    void searchPlace(final String query) {
+        flash("Searching " + query + "…");
+        new Thread(new Runnable() { public void run() {
+            final List<Place> out = new ArrayList<Place>();
+            try {
+                // "Paris, France" -> search "Paris", keep matches whose region or country contains "France".
+                String name = query, filter = null;
+                int comma = query.indexOf(',');
+                if (comma > 0) { name = query.substring(0, comma).trim(); filter = query.substring(comma + 1).trim().toLowerCase(Locale.ROOT); }
+                String u = "https://geocoding-api.open-meteo.com/v1/search?count=10&language=en&format=json&name=" + java.net.URLEncoder.encode(name, "UTF-8");
+                org.json.JSONArray r = new JSONObject(Updater.get(u)).optJSONArray("results");
+                if (r != null) for (int i = 0; i < r.length(); i++) {
+                    JSONObject o = r.getJSONObject(i);
+                    String nm = o.optString("name"), a1 = o.optString("admin1", ""), co = o.optString("country", ""), cc = o.optString("country_code", ""), fc = o.optString("feature_code", "");
+                    if (filter != null && filter.length() > 0 && !(a1.toLowerCase(Locale.ROOT).contains(filter) || co.toLowerCase(Locale.ROOT).contains(filter) || cc.equalsIgnoreCase(filter))) continue;
+                    if (fc.startsWith("PCL")) {
+                        // A country: use its capital for the weather.
+                        Place cap = capitalOf(cc, co);
+                        if (cap != null) { out.add(0, cap); continue; }
+                    }
+                    Place p = new Place();
+                    p.name = nm; p.cc = cc; p.lat = o.getDouble("latitude"); p.lon = o.getDouble("longitude");
+                    StringBuilder lb = new StringBuilder(nm);
+                    if (a1.length() > 0 && !a1.equals(nm)) lb.append(", ").append(a1);
+                    if (co.length() > 0 && !co.equals(nm)) lb.append(", ").append(co);
+                    p.label = lb.toString();
+                    out.add(p);
+                    if (out.size() >= 8) break;
+                }
+            } catch (Throwable t) { }
+            ui.post(new Runnable() { public void run() { showPlaces(query, out); } });
+        } }).start();
+    }
+
+    Place capitalOf(String cc, String country) {
+        try {
+            org.json.JSONArray a = new org.json.JSONArray(Updater.get("https://restcountries.com/v3.1/alpha/" + cc + "?fields=capital,capitalInfo"));
+            JSONObject o = a.length() > 0 ? a.getJSONObject(0) : null;
+            if (o == null) return null;
+            String cap = o.getJSONArray("capital").getString(0);
+            org.json.JSONArray ll = o.getJSONObject("capitalInfo").getJSONArray("latlng");
+            Place p = new Place(); p.name = cap; p.cc = cc; p.lat = ll.getDouble(0); p.lon = ll.getDouble(1);
+            p.label = cap + ", " + country + " (capital)";
+            return p;
+        } catch (Throwable t) {
+            try {
+                JSONObject o = new JSONObject(Updater.get("https://restcountries.com/v3.1/alpha/" + cc + "?fields=capital,capitalInfo"));
+                String cap = o.getJSONArray("capital").getString(0);
+                org.json.JSONArray ll = o.getJSONObject("capitalInfo").getJSONArray("latlng");
+                Place p = new Place(); p.name = cap; p.cc = cc; p.lat = ll.getDouble(0); p.lon = ll.getDouble(1);
+                p.label = cap + ", " + country + " (capital)";
+                return p;
+            } catch (Throwable t2) { return null; }
+        }
+    }
+
+    void showPlaces(String query, final List<Place> list) {
+        if (list.isEmpty()) { flash("No place found for \"" + query + "\". Try another spelling."); return; }
+        if (!(getContext() instanceof android.app.Activity) || ((android.app.Activity) getContext()).isFinishing()) return;
+        String[] labels = new String[list.size()];
+        for (int i = 0; i < labels.length; i++) labels[i] = list.get(i).label;
+        new android.app.AlertDialog.Builder(getContext(), android.R.style.Theme_DeviceDefault_Dialog_Alert)
+                .setTitle("Pick your location")
+                .setItems(labels, new android.content.DialogInterface.OnClickListener() { public void onClick(android.content.DialogInterface di, int i) {
+                    Place p = list.get(i); setPlace(p.name, p.lat, p.lon, p.cc);
+                } })
+                .setNegativeButton("Search again", new android.content.DialogInterface.OnClickListener() { public void onClick(android.content.DialogInterface di, int i) { askPlace(); } })
+                .show();
+    }
+
     // ---------- weather (Open-Meteo, no key) ----------
     void fetchWeather() {
         if (wBusy) return;
         wBusy = true;
-        final int c = city; final boolean cel = celsius;
+        final int c = placeGen; final double la = placeLat, lo = placeLon; final String key = placeKey(), cc = placeCC; final boolean cel = celsius;
         new Thread(new Runnable() { public void run() {
             String body = null;
             try {
-                String u = "https://api.open-meteo.com/v1/forecast?latitude=" + CITY_LAT[c] + "&longitude=" + CITY_LON[c]
+                String u = "https://api.open-meteo.com/v1/forecast?latitude=" + la + "&longitude=" + lo
                         + "&current=temperature_2m,apparent_temperature,weather_code"
                         + "&daily=weather_code,temperature_2m_max,temperature_2m_min&forecast_days=3&timezone=auto"
                         + (cel ? "" : "&temperature_unit=fahrenheit");
@@ -306,10 +469,10 @@ public class GlassView extends View {
             final String b = body;
             ui.post(new Runnable() { public void run() {
                 wBusy = false;
-                if (b != null && c == city && cel == celsius && applyWeather(b, System.currentTimeMillis())) {
-                    prefs.edit().putString("wx", b).putLong("wxAt", wAt).putInt("wxCity", c).putBoolean("wxCel", cel).apply();
+                if (b != null && c == placeGen && cel == celsius && applyWeather(b, System.currentTimeMillis())) {
+                    prefs.edit().putString("wx", b).putLong("wxAt", wAt).putString("wxPlace", key).putBoolean("wxCel", cel).apply();
                     wStale = false;
-                    fetchAlerts(c);
+                    fetchAlerts(c, la, lo, cc);
                 } else if (b == null) {
                     if (wTemp == null) wCond = "Weather unavailable";
                     wStale = true;
@@ -319,13 +482,13 @@ public class GlassView extends View {
         } }).start();
     }
 
-    static final int US_CITIES = 7; // Houston..Los Angeles; the National Weather Service only covers the US
-    void fetchAlerts(final int c) {
-        if (c >= US_CITIES) { wAlert = null; return; }
+    // The National Weather Service only covers the US.
+    void fetchAlerts(final int c, final double la, final double lo, String cc) {
+        if (!"US".equalsIgnoreCase(cc)) { wAlert = null; return; }
         new Thread(new Runnable() { public void run() {
             String a = null;
             try {
-                JSONObject j = new JSONObject(Updater.get("https://api.weather.gov/alerts/active?point=" + CITY_LAT[c] + "," + CITY_LON[c]));
+                JSONObject j = new JSONObject(Updater.get("https://api.weather.gov/alerts/active?point=" + String.format(Locale.US, "%.4f,%.4f", la, lo)));
                 org.json.JSONArray f = j.getJSONArray("features");
                 if (f.length() > 0) {
                     JSONObject pr = f.getJSONObject(0).getJSONObject("properties");
@@ -341,13 +504,13 @@ public class GlassView extends View {
                 }
             } catch (Throwable t) { a = wAlert; }
             final String fa = a;
-            ui.post(new Runnable() { public void run() { if (c == city) { wAlert = fa; invalidate(); } } });
+            ui.post(new Runnable() { public void run() { if (c == placeGen) { wAlert = fa; invalidate(); } } });
         } }).start();
     }
 
     void loadSavedWeather() {
         String b = prefs.getString("wx", null);
-        if (b != null && prefs.getInt("wxCity", -1) == city && prefs.getBoolean("wxCel", false) == celsius) {
+        if (b != null && placeKey().equals(prefs.getString("wxPlace", "")) && prefs.getBoolean("wxCel", false) == celsius) {
             if (applyWeather(b, prefs.getLong("wxAt", 0))) wStale = true;
         }
     }
@@ -566,17 +729,17 @@ public class GlassView extends View {
 
     static final int ALL_COLS = 7;
     void allKey(boolean ok, boolean back, int dx, int dy) {
-        if (back) { closeAll(); return; }
+        if (back) { if (pickMode) finishPicker(); else closeAll(); return; }
         int n = all.size(); if (n == 0) return;
         if (dx != 0) allIdx = clamp(allIdx + dx, 0, n - 1);
         if (dy != 0) { int t = allIdx + dy * ALL_COLS; if (t >= 0 && t < n) allIdx = t; else if (dy > 0) allIdx = n - 1; }
-        if (ok) { launch(all.get(allIdx).pkg); closeAll(); }
+        if (ok) { if (pickMode) togglePick(all.get(allIdx).pkg); else { launch(all.get(allIdx).pkg); closeAll(); } }
         int row = allIdx / ALL_COLS;
         if (row < allScroll) allScroll = row;
         if (row > allScroll + 2) allScroll = row - 2;
     }
 
-    static final String[] SET_LABELS = { "Home button", "Background", "Clock format", "Low power mode", "Glass blur", "Temperature", "Weather city", "Open when TV starts", "App update", "Android TV settings" };
+    static final String[] SET_LABELS = { "Home button", "Favorites", "Background", "Clock format", "Low power mode", "Glass blur", "Temperature", "Weather location", "Open when TV starts", "App update", "Android TV settings" };
     void settingsKey(boolean ok, boolean back, int dx, int dy) {
         if (back) { showSettings = false; return; }
         if (dy != 0) { setIdx = clamp(setIdx + dy, 0, SET_LABELS.length - 1); return; }
@@ -585,16 +748,17 @@ public class GlassView extends View {
         SharedPreferences.Editor e = prefs.edit();
         switch (setIdx) {
             case 0: if (ok) { if (homeServiceOn() && HomeKeyService.switchToGoogleTv(getContext())) showSettings = false; else start(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)); } break;
-            case 1: { scanBackgrounds(); int n = bgCount() + 1, cur = bgMode == ROTATE ? n - 1 : bgMode; cur = (cur + step + n) % n;
+            case 1: if (ok) { e.apply(); openPicker(); return; } break;
+            case 2: { scanBackgrounds(); int n = bgCount() + 1, cur = bgMode == ROTATE ? n - 1 : bgMode; cur = (cur + step + n) % n;
                       bgMode = cur == n - 1 ? ROTATE : cur; if (bgMode != ROTATE) bgIdx = bgMode; e.putInt("bgMode", bgMode).putInt("bgIdx", bgIdx); dropBitmaps(); break; }
-            case 2: clockMode = (clockMode + step + 3) % 3; e.putInt("clock", clockMode); break;
-            case 3: lowPower = !lowPower; e.putBoolean("lowPower", lowPower); dropBitmaps(); break;
-            case 4: blurLevel = (blurLevel + step + 3) % 3; e.putInt("blur", blurLevel); dropBitmaps(); break;
-            case 5: celsius = !celsius; e.putBoolean("celsius", celsius); clearWeather(); fetchWeather(); break;
-            case 6: city = (city + step + CITY_NAME.length) % CITY_NAME.length; e.putInt("city", city); clearWeather(); fetchWeather(); break;
-            case 7: bootStart = !bootStart; e.putBoolean("bootStart", bootStart); break;
-            case 8: if (ok) { if (updater.updateReady()) updater.install(); else updater.check(); } break;
-            case 9: if (ok) start(new Intent(Settings.ACTION_SETTINGS)); break;
+            case 3: clockMode = (clockMode + step + 3) % 3; e.putInt("clock", clockMode); break;
+            case 4: lowPower = !lowPower; e.putBoolean("lowPower", lowPower); dropBitmaps(); break;
+            case 5: blurLevel = (blurLevel + step + 3) % 3; e.putInt("blur", blurLevel); dropBitmaps(); break;
+            case 6: celsius = !celsius; e.putBoolean("celsius", celsius); clearWeather(); fetchWeather(); break;
+            case 7: if (ok) { e.apply(); askPlace(); } break;
+            case 8: bootStart = !bootStart; e.putBoolean("bootStart", bootStart); break;
+            case 9: if (ok) { if (updater.updateReady()) updater.install(); else updater.check(); } break;
+            case 10: if (ok) start(new Intent(Settings.ACTION_SETTINGS)); break;
         }
         e.apply();
     }
@@ -602,14 +766,15 @@ public class GlassView extends View {
     String setValue(int i) {
         switch (i) {
             case 0: return homeServiceOn() ? "WLH Glass — OK switches to Google TV" : "Google TV — OK, then turn on WLH Glass Home button";
-            case 1: return bgMode != ROTATE ? bgName(bgMode) : "Rotate every 15 min (now " + bgName(bgIdx) + ")";
-            case 2: return clockMode == 0 ? "24-hour" : clockMode == 1 ? "12-hour" : "Follow TV (" + (DateFormat.is24HourFormat(getContext()) ? "24-hour" : "12-hour") + ")";
-            case 3: return lowPower ? "On" : "Off";
-            case 4: return blurLevel == 0 ? "Light" : blurLevel == 1 ? "Medium" : "Strong";
-            case 5: return celsius ? "°C" : "°F";
-            case 6: return CITY_NAME[city];
-            case 7: return bootStart ? "On" : "Off";
-            case 8: {
+            case 1: return (favCustom ? favPkgs.size() + " picked" : "Default") + " — OK to pick";
+            case 2: return bgMode != ROTATE ? bgName(bgMode) : "Rotate every 15 min (now " + bgName(bgIdx) + ")";
+            case 3: return clockMode == 0 ? "24-hour" : clockMode == 1 ? "12-hour" : "Follow TV (" + (DateFormat.is24HourFormat(getContext()) ? "24-hour" : "12-hour") + ")";
+            case 4: return lowPower ? "On" : "Off";
+            case 5: return blurLevel == 0 ? "Light" : blurLevel == 1 ? "Medium" : "Strong";
+            case 6: return celsius ? "°C" : "°F";
+            case 7: return placeShort() + " — OK to change";
+            case 8: return bootStart ? "On" : "Off";
+            case 9: {
                 if (updater.state.length() > 0) return updater.state;
                 if (updater.updateReady()) return "Version " + updater.latestName() + " ready — OK to install";
                 return "Up to date (" + updater.myName() + ") — OK to check";
@@ -880,7 +1045,7 @@ public class GlassView extends View {
 
         // weather
         glass(c, 1480, 190, 368, 400, 40, false);
-        text(c, CITY_NAME[city], 1514, 238, 22, med, 0xE0FFFFFF, Paint.Align.LEFT);
+        text(c, placeShort(), 1514, 238, 22, med, 0xE0FFFFFF, Paint.Align.LEFT);
         if (wAt > 0) {
             String when = new SimpleDateFormat(h24 ? "HH:mm" : "h:mm a", Locale.getDefault()).format(new Date(wAt));
             text(c, (wStale ? "Outdated · " : "Updated ") + when, 1814, 238, 16, med, wStale ? 0xFFFFC27A : 0xB3FFFFFF, Paint.Align.RIGHT);
@@ -956,7 +1121,7 @@ public class GlassView extends View {
         glass(c, ox - 40, oy - 230, 760, 330, 48, true);
         text(c, new SimpleDateFormat(h24 ? "HH:mm" : "h:mm", Locale.getDefault()).format(now), ox, oy - 40, 160, light, Color.WHITE, Paint.Align.LEFT);
         String line = new SimpleDateFormat("EEEE, MMMM d", Locale.getDefault()).format(now);
-        if (wTemp != null) line += "   ·   " + CITY_NAME[city] + " " + wTemp + " " + wCond;
+        if (wTemp != null) line += "   ·   " + placeShort() + " " + wTemp + " " + wCond;
         text(c, line, ox + 6, oy + 30, 28, reg, 0xE6FFFFFF, Paint.Align.LEFT);
         c.restore();
     }
@@ -999,8 +1164,13 @@ public class GlassView extends View {
     void drawAll(Canvas c) {
         p.setColor(0x99060816); c.drawRect(0, 0, 1920, 1080, p);
         glass(c, 120, 90, 1680, 900, 48, true);
-        text(c, "All apps", 180, 170, 44, bold, Color.WHITE, Paint.Align.LEFT);
-        text(c, all.size() + " apps  ·  Back to close", 1740, 170, 22, reg, 0xCCFFFFFF, Paint.Align.RIGHT);
+        if (pickMode) {
+            text(c, "Pick favorites  " + favPkgs.size() + "/8", 180, 170, 44, bold, Color.WHITE, Paint.Align.LEFT);
+            text(c, "OK adds or removes  ·  Order = the order you pick  ·  Back saves", 1740, 170, 22, reg, 0xCCFFFFFF, Paint.Align.RIGHT);
+        } else {
+            text(c, "All apps", 180, 170, 44, bold, Color.WHITE, Paint.Align.LEFT);
+            text(c, all.size() + " apps  ·  Back to close", 1740, 170, 22, reg, 0xCCFFFFFF, Paint.Align.RIGHT);
+        }
         float tile = 160, gapX = 66, gapY = 92;
         for (int i = 0; i < all.size(); i++) {
             int row = i / ALL_COLS - allScroll, col = i % ALL_COLS;
@@ -1009,6 +1179,13 @@ public class GlassView extends View {
             glass(c, x, y, tile, tile, 38, false);
             if (i == allIdx) focusRing(c, x, y, tile, tile, 38);
             icon(c, iconFor(all.get(i)), x + 28, y + 28, tile - 56);
+            if (pickMode) {
+                int pos = favPkgs.indexOf(all.get(i).pkg);
+                if (pos >= 0) {
+                    p.setColor(0xFF2F7BFF); c.drawCircle(x + tile - 14, y + 14, 22, p);
+                    text(c, String.valueOf(pos + 1), x + tile - 14, y + 23, 24, bold, Color.WHITE, Paint.Align.CENTER);
+                }
+            }
             String lab = all.get(i).label;
             if (measure(lab, 20, med) > tile + 50) lab = lab.substring(0, Math.min(lab.length(), 14)) + "…";
             text(c, lab, x + tile / 2, y + tile + 34, 20, med, Color.WHITE, Paint.Align.CENTER);
@@ -1045,10 +1222,10 @@ public class GlassView extends View {
         text(c, "WLH Glass settings", 520, 200, 40, bold, Color.WHITE, Paint.Align.LEFT);
         text(c, "OK or ← → to change  ·  Back to close", 1400, 200, 20, reg, 0xCCFFFFFF, Paint.Align.RIGHT);
         for (int i = 0; i < SET_LABELS.length; i++) {
-            float y = 238 + i * 70;
-            if (i == setIdx) { p.setColor(0x2EFFFFFF); r.set(500, y, 1420, y + 60); c.drawRoundRect(r, 20, 20, p); focusRing(c, 500, y, 920, 60, 20); }
-            text(c, SET_LABELS[i], 540, y + 40, 24, med, Color.WHITE, Paint.Align.LEFT);
-            text(c, setValue(i), 1384, y + 40, 22, reg, 0xE0FFFFFF, Paint.Align.RIGHT);
+            float y = 232 + i * 65;
+            if (i == setIdx) { p.setColor(0x2EFFFFFF); r.set(500, y, 1420, y + 56); c.drawRoundRect(r, 20, 20, p); focusRing(c, 500, y, 920, 56, 20); }
+            text(c, SET_LABELS[i], 540, y + 37, 23, med, Color.WHITE, Paint.Align.LEFT);
+            text(c, setValue(i), 1384, y + 37, 21, reg, 0xE0FFFFFF, Paint.Align.RIGHT);
         }
     }
 }
