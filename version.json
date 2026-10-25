@@ -1,6 +1,6 @@
 {
-  "versionCode": 11,
-  "versionName": "1.8",
-  "apk": "https://raw.githubusercontent.com/whitecoco20/wlh-glass-updates/main/releases/wlh-glass-1.8.apk",
-  "notes": "24-hour clock by default. New Settings > Clock format: 24-hour, 12-hour or follow the TV."
+  "versionCode": 12,
+  "versionName": "1.9",
+  "apk": "https://raw.githubusercontent.com/whitecoco20/wlh-glass-updates/main/releases/wlh-glass-1.9.apk",
+  "notes": "Type any city or country for weather. Pick your 8 favorite apps with the remote."
 }
