@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">WLH Glass</string>
+    <string name="svc_name">WLH Glass Home button</string>
+    <string name="svc_desc">Makes the remote\'s Home button open WLH Glass. It only reads the Home key. Turn this off to go back to Google TV\'s home screen.</string>
+</resources>
