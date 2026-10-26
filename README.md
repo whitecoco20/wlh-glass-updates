@@ -14,7 +14,7 @@ Built and tested on an **onn. Full HD Streaming Device** (Google TV, Android 14)
 - **Your own backgrounds.** A built-in sunset scene, plus any photos you drop in a folder on the TV. Flip with one button or rotate every 15 minutes.
 - **Home button takeover.** An optional switch makes the remote's Home button and power-on open WLH Glass. Turn it off any time to get Google TV back.
 - **Sleep timer.** 15 to 120 minutes, keeps counting while you watch other apps.
-- **Screensaver.** Your background with a big clock and the weather.
+- **Screensaver.** Cycles through all your background photos (2 minutes each) with a big clock and the weather.
 - **Auto-update.** Settings › App update finds and installs new versions (you confirm on screen).
 - **Light.** About 35–45 MB of memory. Low power mode turns the blur off.
 
@@ -35,7 +35,7 @@ Tried it on another device? Open an issue with the model, Android version and wh
 
 1. On the TV, install **Downloader** (by AFTVnews) from the Play Store.
 2. In Downloader, open this link and install:
-   `https://raw.githubusercontent.com/whitecoco20/wlh-glass-updates/main/releases/wlh-glass-2.0.apk`
+   `https://raw.githubusercontent.com/whitecoco20/wlh-glass-updates/main/releases/wlh-glass-2.1.apk`
    Allow Downloader to install apps when Android asks. If Play Protect warns you, choose **Install anyway**.
 3. Open **WLH Glass** from your apps.
 

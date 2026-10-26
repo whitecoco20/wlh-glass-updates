@@ -115,7 +115,7 @@ public class GlassView extends View {
         return n.length() > 0 ? Character.toUpperCase(n.charAt(0)) + n.substring(1) : n;
     }
     final Runnable bgTick = new Runnable() { public void run() {
-        if (bgMode == ROTATE && bgCount() > 1) { bgIdx = (bgIdx + 1) % bgCount(); prefs.edit().putInt("bgIdx", bgIdx).apply(); dropBitmaps(); invalidate(); }
+        if (!dreamMode && bgMode == ROTATE && bgCount() > 1) { bgIdx = (bgIdx + 1) % bgCount(); prefs.edit().putInt("bgIdx", bgIdx).apply(); dropBitmaps(); invalidate(); }
         ui.postDelayed(this, 15 * 60 * 1000L);
     } };
     void nextBackground() {
@@ -128,6 +128,13 @@ public class GlassView extends View {
         dropBitmaps();
     }
     boolean dreamMode = false;
+    // Screensaver: shows every background in turn (2 minutes each). Does not change the home screen's choice.
+    static final long DREAM_STEP = 2 * 60 * 1000L;
+    final Runnable dreamTick = new Runnable() { public void run() {
+        scanBackgrounds();
+        if (bgCount() > 1) { bgIdx = (bgIdx + 1) % bgCount(); dropBitmaps(); invalidate(); }
+        ui.postDelayed(this, DREAM_STEP);
+    } };
     Updater updater;
     String wAlert = null;
     String msg = null; long msgUntil = 0;
@@ -195,11 +202,12 @@ public class GlassView extends View {
         ui.removeCallbacks(wxTick); ui.postDelayed(wxTick, 30 * 60 * 1000L);
         ui.removeCallbacks(bgTick); ui.postDelayed(bgTick, 15 * 60 * 1000L);
         if (!dreamMode) updater.checkIfDue();
+        else { ui.removeCallbacks(dreamTick); ui.postDelayed(dreamTick, DREAM_STEP); }
         scanBackgrounds();
         requestFocus();
         invalidate();
     }
-    void onHidden() { ui.removeCallbacks(tick); ui.removeCallbacks(wxTick); ui.removeCallbacks(bgTick); }
+    void onHidden() { ui.removeCallbacks(dreamTick); ui.removeCallbacks(tick); ui.removeCallbacks(wxTick); ui.removeCallbacks(bgTick); }
     void release() { ui.removeCallbacksAndMessages(null); if (wall != null) wall.recycle(); if (blur != null) blur.recycle(); wall = blur = null; }
     void trim(int level) {
         if (level >= 20) { for (App a : all) if (!isFav(a.pkg)) a.icon = null; }

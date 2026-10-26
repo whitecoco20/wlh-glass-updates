@@ -1,6 +1,6 @@
 {
-  "versionCode": 13,
-  "versionName": "2.0",
-  "apk": "https://raw.githubusercontent.com/whitecoco20/wlh-glass-updates/main/releases/wlh-glass-2.0.apk",
-  "notes": "The clock now follows your weather location's time zone. Switch back to TV time in Settings > Clock time zone."
+  "versionCode": 14,
+  "versionName": "2.1",
+  "apk": "https://raw.githubusercontent.com/whitecoco20/wlh-glass-updates/main/releases/wlh-glass-2.1.apk",
+  "notes": "Screensaver now shows all your background photos in turn, 2 minutes each."
 }
