@@ -73,6 +73,15 @@ public class GlassView extends View {
     boolean lowPower; int blurLevel; boolean celsius; boolean bootStart;
     // Weather location: any city or country the viewer types in (Open-Meteo geocoding).
     String placeName; double placeLat, placeLon; String placeCC; int placeGen = 0;
+    // Clock time zone: the weather location's zone (default) or the TV's own.
+    String placeTZ = ""; boolean tzFromPlace = true;
+    java.util.TimeZone clockZone() {
+        if (tzFromPlace && placeTZ != null && placeTZ.length() > 0) return java.util.TimeZone.getTimeZone(placeTZ);
+        return java.util.TimeZone.getDefault();
+    }
+    SimpleDateFormat fmt(String pattern) { SimpleDateFormat f = new SimpleDateFormat(pattern, Locale.getDefault()); f.setTimeZone(clockZone()); return f; }
+    /** True when the clock shows a different time than the TV's own zone. */
+    boolean otherZone() { long t = System.currentTimeMillis(); return clockZone().getOffset(t) != java.util.TimeZone.getDefault().getOffset(t); }
     // Favorites: picked on the TV (Settings > Favorites). Empty = defaults below + auto-fill.
     final List<String> favPkgs = new ArrayList<String>(); boolean favCustom = false;
     boolean pickMode = false;
@@ -162,6 +171,8 @@ public class GlassView extends View {
         blurLevel = prefs.getInt("blur", 1);
         celsius = prefs.getBoolean("celsius", false);
         loadPlace();
+        placeTZ = prefs.getString("placeTZ", "");
+        tzFromPlace = prefs.getBoolean("tzFromPlace", true);
         loadFavList();
         bootStart = prefs.getBoolean("bootStart", true);
         clockMode = prefs.getInt("clock", 0);
@@ -333,18 +344,23 @@ public class GlassView extends View {
             placeCC = i < 7 ? "US" : i < 9 ? "CO" : "MX";
         }
     }
-    void setPlace(String name, double lat, double lon, String cc) {
+    void setPlace(String name, double lat, double lon, String cc, String tz) {
         placeName = name; placeLat = lat; placeLon = lon; placeCC = cc == null ? "" : cc; placeGen++;
+        placeTZ = tz == null ? "" : tz; prefs.edit().putString("placeTZ", placeTZ).apply();
         prefs.edit().putString("placeName", name).putLong("placeLat", Double.doubleToLongBits(lat))
                 .putLong("placeLon", Double.doubleToLongBits(lon)).putString("placeCC", placeCC).apply();
         wAlert = null; clearWeather(); fetchWeather();
         flash("Weather: " + name);
         invalidate();
     }
+    void setPlaceTZ(String tz) {
+        if (tz == null || tz.equals(placeTZ)) return;
+        placeTZ = tz; prefs.edit().putString("placeTZ", tz).apply(); invalidate();
+    }
     String placeKey() { return placeName + "|" + placeLat + "|" + placeLon; }
     String placeShort() { String n = placeName == null ? "" : placeName; return n.length() > 18 ? n.substring(0, 17) + "…" : n; }
 
-    static class Place { String label, name, cc; double lat, lon; }
+    static class Place { String label, name, cc, tz; double lat, lon; }
 
     /** Opens the TV keyboard; the viewer types a city or a country, then picks from the matches. */
     void askPlace() {
@@ -396,7 +412,7 @@ public class GlassView extends View {
                         if (cap != null) { out.add(0, cap); continue; }
                     }
                     Place p = new Place();
-                    p.name = nm; p.cc = cc; p.lat = o.getDouble("latitude"); p.lon = o.getDouble("longitude");
+                    p.name = nm; p.cc = cc; p.tz = o.optString("timezone", ""); p.lat = o.getDouble("latitude"); p.lon = o.getDouble("longitude");
                     StringBuilder lb = new StringBuilder(nm);
                     if (a1.length() > 0 && !a1.equals(nm)) lb.append(", ").append(a1);
                     if (co.length() > 0 && !co.equals(nm)) lb.append(", ").append(co);
@@ -439,7 +455,7 @@ public class GlassView extends View {
         new android.app.AlertDialog.Builder(getContext(), android.R.style.Theme_DeviceDefault_Dialog_Alert)
                 .setTitle("Pick your location")
                 .setItems(labels, new android.content.DialogInterface.OnClickListener() { public void onClick(android.content.DialogInterface di, int i) {
-                    Place p = list.get(i); setPlace(p.name, p.lat, p.lon, p.cc);
+                    Place p = list.get(i); setPlace(p.name, p.lat, p.lon, p.cc, p.tz);
                 } })
                 .setNegativeButton("Search again", new android.content.DialogInterface.OnClickListener() { public void onClick(android.content.DialogInterface di, int i) { askPlace(); } })
                 .show();
@@ -497,7 +513,7 @@ public class GlassView extends View {
                     if (end.length() >= 16) {
                         try {
                             Date d = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.US).parse(end);
-                            a += " until " + new SimpleDateFormat(use24() ? "EEE HH:mm" : "EEE h a", Locale.getDefault()).format(d);
+                            a += " until " + fmt(use24() ? "EEE HH:mm" : "EEE h a").format(d);
                         } catch (Throwable ignored) { }
                     }
                     if (f.length() > 1) a += "  (+" + (f.length() - 1) + " more)";
@@ -519,6 +535,8 @@ public class GlassView extends View {
         try {
             JSONObject j = new JSONObject(body);
             JSONObject cur = j.getJSONObject("current");
+            String tz = j.optString("timezone", "");
+            if (tz.length() > 0 && !tz.equals("GMT")) setPlaceTZ(tz);
             JSONObject d = j.getJSONObject("daily");
             wTemp = Math.round(cur.getDouble("temperature_2m")) + "°";
             wFeels = "Feels " + Math.round(cur.getDouble("apparent_temperature")) + "°";
@@ -739,7 +757,7 @@ public class GlassView extends View {
         if (row > allScroll + 2) allScroll = row - 2;
     }
 
-    static final String[] SET_LABELS = { "Home button", "Favorites", "Background", "Clock format", "Low power mode", "Glass blur", "Temperature", "Weather location", "Open when TV starts", "App update", "Android TV settings" };
+    static final String[] SET_LABELS = { "Home button", "Favorites", "Background", "Clock format", "Clock time zone", "Low power mode", "Glass blur", "Temperature", "Weather location", "Open when TV starts", "App update", "Android TV settings" };
     void settingsKey(boolean ok, boolean back, int dx, int dy) {
         if (back) { showSettings = false; return; }
         if (dy != 0) { setIdx = clamp(setIdx + dy, 0, SET_LABELS.length - 1); return; }
@@ -752,13 +770,14 @@ public class GlassView extends View {
             case 2: { scanBackgrounds(); int n = bgCount() + 1, cur = bgMode == ROTATE ? n - 1 : bgMode; cur = (cur + step + n) % n;
                       bgMode = cur == n - 1 ? ROTATE : cur; if (bgMode != ROTATE) bgIdx = bgMode; e.putInt("bgMode", bgMode).putInt("bgIdx", bgIdx); dropBitmaps(); break; }
             case 3: clockMode = (clockMode + step + 3) % 3; e.putInt("clock", clockMode); break;
-            case 4: lowPower = !lowPower; e.putBoolean("lowPower", lowPower); dropBitmaps(); break;
-            case 5: blurLevel = (blurLevel + step + 3) % 3; e.putInt("blur", blurLevel); dropBitmaps(); break;
-            case 6: celsius = !celsius; e.putBoolean("celsius", celsius); clearWeather(); fetchWeather(); break;
-            case 7: if (ok) { e.apply(); askPlace(); } break;
-            case 8: bootStart = !bootStart; e.putBoolean("bootStart", bootStart); break;
-            case 9: if (ok) { if (updater.updateReady()) updater.install(); else updater.check(); } break;
-            case 10: if (ok) start(new Intent(Settings.ACTION_SETTINGS)); break;
+            case 4: tzFromPlace = !tzFromPlace; e.putBoolean("tzFromPlace", tzFromPlace); break;
+            case 5: lowPower = !lowPower; e.putBoolean("lowPower", lowPower); dropBitmaps(); break;
+            case 6: blurLevel = (blurLevel + step + 3) % 3; e.putInt("blur", blurLevel); dropBitmaps(); break;
+            case 7: celsius = !celsius; e.putBoolean("celsius", celsius); clearWeather(); fetchWeather(); break;
+            case 8: if (ok) { e.apply(); askPlace(); } break;
+            case 9: bootStart = !bootStart; e.putBoolean("bootStart", bootStart); break;
+            case 10: if (ok) { if (updater.updateReady()) updater.install(); else updater.check(); } break;
+            case 11: if (ok) start(new Intent(Settings.ACTION_SETTINGS)); break;
         }
         e.apply();
     }
@@ -769,12 +788,13 @@ public class GlassView extends View {
             case 1: return (favCustom ? favPkgs.size() + " picked" : "Default") + " — OK to pick";
             case 2: return bgMode != ROTATE ? bgName(bgMode) : "Rotate every 15 min (now " + bgName(bgIdx) + ")";
             case 3: return clockMode == 0 ? "24-hour" : clockMode == 1 ? "12-hour" : "Follow TV (" + (DateFormat.is24HourFormat(getContext()) ? "24-hour" : "12-hour") + ")";
-            case 4: return lowPower ? "On" : "Off";
-            case 5: return blurLevel == 0 ? "Light" : blurLevel == 1 ? "Medium" : "Strong";
-            case 6: return celsius ? "°C" : "°F";
-            case 7: return placeShort() + " — OK to change";
-            case 8: return bootStart ? "On" : "Off";
-            case 9: {
+            case 4: return tzFromPlace ? "Weather location (" + (placeTZ.length() > 0 ? placeTZ.replace('_', ' ') : "loading") + ")" : "TV time";
+            case 5: return lowPower ? "On" : "Off";
+            case 6: return blurLevel == 0 ? "Light" : blurLevel == 1 ? "Medium" : "Strong";
+            case 7: return celsius ? "°C" : "°F";
+            case 8: return placeShort() + " — OK to change";
+            case 9: return bootStart ? "On" : "Off";
+            case 10: {
                 if (updater.state.length() > 0) return updater.state;
                 if (updater.updateReady()) return "Version " + updater.latestName() + " ready — OK to install";
                 return "Up to date (" + updater.myName() + ") — OK to check";
@@ -993,8 +1013,8 @@ public class GlassView extends View {
         // clock
         Date now = new Date();
         boolean h24 = use24();
-        text(c, new SimpleDateFormat(h24 ? "HH:mm" : "h:mm", Locale.getDefault()).format(now), 72, 140, 88, light, Color.WHITE, Paint.Align.LEFT);
-        text(c, new SimpleDateFormat("EEEE, MMMM d", Locale.getDefault()).format(now), 74, 184, 26, reg, 0xD1FFFFFF, Paint.Align.LEFT);
+        text(c, fmt(h24 ? "HH:mm" : "h:mm").format(now), 72, 140, 88, light, Color.WHITE, Paint.Align.LEFT);
+        text(c, (fmt("EEEE, MMMM d").format(now) + (otherZone() ? "  ·  " + placeShort() + " time" : "")), 74, 184, 26, reg, 0xD1FFFFFF, Paint.Align.LEFT);
 
         // side menu
         glass(c, 64, 250, 320, 18 * 2 + NAV.length * 72 + (NAV.length - 1) * 8, 36, true);
@@ -1047,7 +1067,7 @@ public class GlassView extends View {
         glass(c, 1480, 190, 368, 400, 40, false);
         text(c, placeShort(), 1514, 238, 22, med, 0xE0FFFFFF, Paint.Align.LEFT);
         if (wAt > 0) {
-            String when = new SimpleDateFormat(h24 ? "HH:mm" : "h:mm a", Locale.getDefault()).format(new Date(wAt));
+            String when = fmt(h24 ? "HH:mm" : "h:mm a").format(new Date(wAt));
             text(c, (wStale ? "Outdated · " : "Updated ") + when, 1814, 238, 16, med, wStale ? 0xFFFFC27A : 0xB3FFFFFF, Paint.Align.RIGHT);
         }
         weatherGlyph(c, 1546, 300, wCode);
@@ -1119,8 +1139,8 @@ public class GlassView extends View {
         Date now = new Date();
         boolean h24 = use24();
         glass(c, ox - 40, oy - 230, 760, 330, 48, true);
-        text(c, new SimpleDateFormat(h24 ? "HH:mm" : "h:mm", Locale.getDefault()).format(now), ox, oy - 40, 160, light, Color.WHITE, Paint.Align.LEFT);
-        String line = new SimpleDateFormat("EEEE, MMMM d", Locale.getDefault()).format(now);
+        text(c, fmt(h24 ? "HH:mm" : "h:mm").format(now), ox, oy - 40, 160, light, Color.WHITE, Paint.Align.LEFT);
+        String line = fmt("EEEE, MMMM d").format(now);
         if (wTemp != null) line += "   ·   " + placeShort() + " " + wTemp + " " + wCond;
         text(c, line, ox + 6, oy + 30, 28, reg, 0xE6FFFFFF, Paint.Align.LEFT);
         c.restore();
@@ -1222,10 +1242,10 @@ public class GlassView extends View {
         text(c, "WLH Glass settings", 520, 200, 40, bold, Color.WHITE, Paint.Align.LEFT);
         text(c, "OK or ← → to change  ·  Back to close", 1400, 200, 20, reg, 0xCCFFFFFF, Paint.Align.RIGHT);
         for (int i = 0; i < SET_LABELS.length; i++) {
-            float y = 232 + i * 65;
-            if (i == setIdx) { p.setColor(0x2EFFFFFF); r.set(500, y, 1420, y + 56); c.drawRoundRect(r, 20, 20, p); focusRing(c, 500, y, 920, 56, 20); }
-            text(c, SET_LABELS[i], 540, y + 37, 23, med, Color.WHITE, Paint.Align.LEFT);
-            text(c, setValue(i), 1384, y + 37, 21, reg, 0xE0FFFFFF, Paint.Align.RIGHT);
+            float y = 230 + i * 60;
+            if (i == setIdx) { p.setColor(0x2EFFFFFF); r.set(500, y, 1420, y + 52); c.drawRoundRect(r, 18, 18, p); focusRing(c, 500, y, 920, 52, 18); }
+            text(c, SET_LABELS[i], 540, y + 34, 22, med, Color.WHITE, Paint.Align.LEFT);
+            text(c, setValue(i), 1384, y + 34, 20, reg, 0xE0FFFFFF, Paint.Align.RIGHT);
         }
     }
 }

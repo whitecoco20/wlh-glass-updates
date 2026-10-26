@@ -9,7 +9,7 @@ Built and tested on an **onn. Full HD Streaming Device** (Google TV, Android 14)
 ## What you get
 
 - **Your apps, no ads.** A glass row of up to 8 favorite apps with their real icons, plus an All apps screen. Pick and order them with the remote in Settings › Favorites. No sponsored rows, no trailers.
-- **24-hour clock.** Default is 24-hour. Change it in Settings › Clock format (24-hour, 12-hour, or follow the TV).
+- **Clock in your location's time.** The clock follows the time zone of your weather location (Settings › Clock time zone switches back to the TV's own time). 24-hour by default; change it in Settings › Clock format (24-hour, 12-hour, or follow the TV).
 - **Live weather, anywhere.** Type any city or country in Settings › Weather location (a country uses its capital). Current temperature, feels-like, high/low and a 3-day forecast (Open-Meteo, no account needed). US locations also show National Weather Service alerts.
 - **Your own backgrounds.** A built-in sunset scene, plus any photos you drop in a folder on the TV. Flip with one button or rotate every 15 minutes.
 - **Home button takeover.** An optional switch makes the remote's Home button and power-on open WLH Glass. Turn it off any time to get Google TV back.
@@ -35,7 +35,7 @@ Tried it on another device? Open an issue with the model, Android version and wh
 
 1. On the TV, install **Downloader** (by AFTVnews) from the Play Store.
 2. In Downloader, open this link and install:
-   `https://raw.githubusercontent.com/whitecoco20/wlh-glass-updates/main/releases/wlh-glass-1.9.apk`
+   `https://raw.githubusercontent.com/whitecoco20/wlh-glass-updates/main/releases/wlh-glass-2.0.apk`
    Allow Downloader to install apps when Android asks. If Play Protect warns you, choose **Install anyway**.
 3. Open **WLH Glass** from your apps.
 

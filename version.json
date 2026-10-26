@@ -1,6 +1,6 @@
 {
-  "versionCode": 12,
-  "versionName": "1.9",
-  "apk": "https://raw.githubusercontent.com/whitecoco20/wlh-glass-updates/main/releases/wlh-glass-1.9.apk",
-  "notes": "Type any city or country for weather. Pick your 8 favorite apps with the remote."
+  "versionCode": 13,
+  "versionName": "2.0",
+  "apk": "https://raw.githubusercontent.com/whitecoco20/wlh-glass-updates/main/releases/wlh-glass-2.0.apk",
+  "notes": "The clock now follows your weather location's time zone. Switch back to TV time in Settings > Clock time zone."
 }
