@@ -15,7 +15,7 @@ Built and tested on an **onn. Full HD Streaming Device** (Google TV, Android 14)
 - **Clock in your location's time.** The clock follows the time zone of your weather location (Settings › Clock time zone switches back to the TV's own time). 24-hour by default; change it in Settings › Clock format (24-hour, 12-hour, or follow the TV).
 - **Live weather, anywhere.** Type any city or country in Settings › Weather location (a country uses its capital). Current temperature, feels-like, high/low and a 3-day forecast (Open-Meteo, no account needed). US locations also show National Weather Service alerts.
 - **Your own backgrounds, sent from your phone.** Settings › Add photos from phone shows a QR code. Scan it on the same Wi-Fi, pick photos, done. Flip with one button or rotate every 15 minutes.
-- **VPN and location pill.** Shows whether a VPN is on and the city/country your connection appears from. OK opens ProtonVPN if it's installed.
+- **VPN and location pill.** Shows whether a VPN is on, plus the city, country and provider your connection appears from. Updates as soon as the VPN connects or drops. OK opens ProtonVPN if it's installed.
 - **HDMI inputs.** On Google TV sets with HDMI ports, an Inputs button switches sources. Hidden on streaming sticks.
 - **Accent color.** Blue, gold, green, pink, purple or white focus glow.
 - **Home button takeover.** An optional switch makes the remote's Home button and power-on open WLH Glass. Turn it off any time to get Google TV back.
@@ -41,7 +41,7 @@ Tried it on another device? Open an issue with the model, Android version and wh
 
 1. On the TV, install **Downloader** (by AFTVnews) from the Play Store.
 2. In Downloader, open this link and install:
-   `https://raw.githubusercontent.com/whitecoco20/wlh-glass-updates/main/releases/wlh-glass-2.2.apk`
+   `https://raw.githubusercontent.com/whitecoco20/wlh-glass-updates/main/releases/wlh-glass-2.3.apk`
    Allow Downloader to install apps when Android asks. If Play Protect warns you, choose **Install anyway**.
 3. Open **WLH Glass** from your apps.
 
@@ -94,6 +94,7 @@ Back to Google's: `adb shell settings put secure screensaver_components com.goog
 
 - Google TV's own home keeps running in the background as a safety net. You may see it for a moment at power-on or when pressing Home.
 - While the Home switch is on, **Amazon Silk** switches to accessibility mode and its free cursor stops working. Switch to Google TV before using Silk (then reopen Silk), or use TV Bro / Downloader's browser.
+- If the pill shows your home city and provider while your VPN app says it's connected, the VPN app is leaving WLH Glass out (split tunneling). Turn split tunneling off, or add WLH Glass to it.
 - "Continue watching" isn't possible: Google TV only shares that list with its own home screen.
 - The Home switch can only be turned **on** from the TV's Accessibility settings (Android security rule).
 

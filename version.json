@@ -1,6 +1,6 @@
 {
-  "versionCode": 15,
-  "versionName": "2.2",
-  "apk": "https://raw.githubusercontent.com/whitecoco20/wlh-glass-updates/main/releases/wlh-glass-2.2.apk",
-  "notes": "Recently opened row, send photos from your phone with a QR code, VPN and location pill, hide apps, world clocks, HDMI inputs, accent colors."
+  "versionCode": 16,
+  "versionName": "2.3",
+  "apk": "https://raw.githubusercontent.com/whitecoco20/wlh-glass-updates/main/releases/wlh-glass-2.3.apk",
+  "notes": "VPN pill updates the moment a VPN connects or drops, and shows the provider your connection comes from."
 }

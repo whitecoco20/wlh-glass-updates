@@ -225,7 +225,7 @@ public class GlassView extends View {
         if (wStale || System.currentTimeMillis() - wAt > 15 * 60 * 1000L) fetchWeather();
         ui.removeCallbacks(wxTick); ui.postDelayed(wxTick, 30 * 60 * 1000L);
         ui.removeCallbacks(bgTick); ui.postDelayed(bgTick, 15 * 60 * 1000L);
-        if (!dreamMode) { updater.checkIfDue(); loadInputs(); checkNet(false); }
+        if (!dreamMode) { updater.checkIfDue(); loadInputs(); watchNetwork(); checkNet(System.currentTimeMillis() - netAt > 60 * 1000L); }
         else { ui.removeCallbacks(dreamTick); ui.postDelayed(dreamTick, DREAM_STEP); }
         scanBackgrounds();
         requestFocus();
@@ -433,6 +433,14 @@ public class GlassView extends View {
                 if (nc != null && nc.hasTransport(android.net.NetworkCapabilities.TRANSPORT_VPN)) return true;
             }
         } catch (Throwable t) { }
+        // Some VPN apps only show up as a tunnel interface (tun0 / ppp0 / wg0).
+        try {
+            for (java.util.Enumeration<java.net.NetworkInterface> en = java.net.NetworkInterface.getNetworkInterfaces(); en.hasMoreElements(); ) {
+                java.net.NetworkInterface ni = en.nextElement();
+                String n = ni.getName().toLowerCase(Locale.US);
+                if (ni.isUp() && (n.startsWith("tun") || n.startsWith("ppp") || n.startsWith("wg") || n.startsWith("ipsec")) && ni.getInetAddresses().hasMoreElements()) return true;
+            }
+        } catch (Throwable t) { }
         return false;
     }
     void checkNet(boolean force) {
@@ -444,21 +452,47 @@ public class GlassView extends View {
         new Thread(new Runnable() { public void run() {
             String where = null;
             try {
-                JSONObject j = new JSONObject(Updater.get("https://ipwho.is/?fields=success,city,country_code"));
-                if (j.optBoolean("success", false)) where = j.optString("city", "") + ", " + j.optString("country_code", "");
+                JSONObject j = new JSONObject(Updater.get("https://ipwho.is/?fields=success,city,country_code,connection"));
+                if (j.optBoolean("success", false)) {
+                    where = j.optString("city", "") + ", " + j.optString("country_code", "");
+                    JSONObject cn = j.optJSONObject("connection");
+                    String isp = cn == null ? "" : cn.optString("isp", cn.optString("org", ""));
+                    if (isp.length() > 0) where += " · " + shortIsp(isp);
+                }
             } catch (Throwable t) { }
             if (where == null) try {
                 JSONObject j = new JSONObject(Updater.get("https://ipapi.co/json/"));
-                if (j.has("city")) where = j.optString("city", "") + ", " + j.optString("country_code", "");
+                if (j.has("city")) { where = j.optString("city", "") + ", " + j.optString("country_code", ""); String org = j.optString("org", ""); if (org.length() > 0) where += " · " + shortIsp(org); }
             } catch (Throwable t) { }
             final String w = where;
             ui.post(new Runnable() { public void run() { netBusy = false; netAt = System.currentTimeMillis(); if (w != null) netWhere = w; invalidate(); } });
         } }).start();
     }
+    static String shortIsp(String isp) {
+        String s = isp.replaceAll("(?i)\\b(AS\\d+|inc\\.?|llc|ltd\\.?|ag|gmbh|s\\.a\\.|corporation|corp\\.?|communications?|holdings?|networks?|services|limited)\\b", "").replaceAll("[,.]", " ").trim().replaceAll("\\s+", " ");
+        if (s.length() == 0) s = isp;
+        return s.length() > 14 ? s.substring(0, 13) + "…" : s;
+    }
+    // Re-check whenever the TV's networks change (VPN connects or drops).
+    boolean netWatch = false;
+    void watchNetwork() {
+        if (netWatch || dreamMode) return;
+        try {
+            android.net.ConnectivityManager cm = (android.net.ConnectivityManager) getContext().getSystemService(Context.CONNECTIVITY_SERVICE);
+            cm.registerNetworkCallback(new android.net.NetworkRequest.Builder().removeCapability(android.net.NetworkCapabilities.NET_CAPABILITY_NOT_VPN).build(),
+                new android.net.ConnectivityManager.NetworkCallback() {
+                    void again() { ui.removeCallbacks(netAgain); ui.postDelayed(netAgain, 3000); }
+                    @Override public void onAvailable(android.net.Network n) { again(); }
+                    @Override public void onLost(android.net.Network n) { again(); }
+                });
+            netWatch = true;
+        } catch (Throwable t) { }
+    }
+    final Runnable netAgain = new Runnable() { public void run() { netAt = 0; checkNet(true); } };
     String netText() {
         String w = netWhere == null ? "Checking…" : netWhere;
         if (w.startsWith(", ")) w = w.substring(2);
-        if (w.length() > 22) w = w.substring(0, 21) + "…";
+        if (w.length() > 34) w = w.substring(0, 33) + "…";
         return (vpnOn ? "VPN · " : "") + w;
     }
 
