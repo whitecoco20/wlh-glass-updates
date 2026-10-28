@@ -118,7 +118,7 @@ The first run creates your own signing key (`glass.keystore`). Keep it safe and 
 ## Publishing an update (maintainers)
 
 1. Bump `versionCode`/`versionName` in `app/AndroidManifest.xml`, run `./build.sh`.
-2. Copy `build/wlh-glass.apk` to `releases/wlh-glass-X.Y.apk`.
+2. Copy `build/wlh-glass.apk` to `releases/wlh-glass-X.Y.apk` **and** over `releases/wlh-glass-latest.apk` (the Downloader short code points at that file, so it never changes).
 3. Update `version.json` (`versionCode`, `versionName`, `apk` link, `notes`) and push.
    TVs check every 6 hours, or right away from Settings › App update.
 
