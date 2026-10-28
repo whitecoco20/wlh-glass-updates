@@ -13,7 +13,7 @@ if [ ! -f "$KS" ]; then
 fi
 B=build; rm -rf $B; mkdir -p $B/obj $B/gen
 aapt package -f -m -J $B/gen -M app/AndroidManifest.xml -S app/res -I "$AJ"
-javac -source 8 -target 8 -bootclasspath "$AJ" -d $B/obj $B/gen/com/wlh/glass/R.java app/src/com/wlh/glass/*.java
+javac -source 8 -target 8 -encoding UTF-8 -bootclasspath "$AJ" -d $B/obj $B/gen/com/wlh/glass/R.java app/src/com/wlh/glass/*.java
 dalvik-exchange --dex --min-sdk-version=23 --output=$B/classes.dex $B/obj
 aapt package -f -M app/AndroidManifest.xml -S app/res -I "$AJ" -F $B/unsigned.apk
 (cd $B && aapt add unsigned.apk classes.dex >/dev/null)

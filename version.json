@@ -1,6 +1,6 @@
 {
-  "versionCode": 14,
-  "versionName": "2.1",
-  "apk": "https://raw.githubusercontent.com/whitecoco20/wlh-glass-updates/main/releases/wlh-glass-2.1.apk",
-  "notes": "Screensaver now shows all your background photos in turn, 2 minutes each."
+  "versionCode": 15,
+  "versionName": "2.2",
+  "apk": "https://raw.githubusercontent.com/whitecoco20/wlh-glass-updates/main/releases/wlh-glass-2.2.apk",
+  "notes": "Recently opened row, send photos from your phone with a QR code, VPN and location pill, hide apps, world clocks, HDMI inputs, accent colors."
 }

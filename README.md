@@ -9,9 +9,15 @@ Built and tested on an **onn. Full HD Streaming Device** (Google TV, Android 14)
 ## What you get
 
 - **Your apps, no ads.** A glass row of up to 8 favorite apps with their real icons, plus an All apps screen. Pick and order them with the remote in Settings › Favorites. No sponsored rows, no trailers.
+- **Recently opened.** The last 6 apps you opened, one press away (Google TV keeps "Continue watching" to itself, so WLH Glass tracks app launches instead).
+- **Hide apps.** Settings › Hide apps removes clutter from All apps. Nothing is disabled or uninstalled.
+- **World clocks.** Up to 3 extra cities next to the main clock (Settings › World clocks).
 - **Clock in your location's time.** The clock follows the time zone of your weather location (Settings › Clock time zone switches back to the TV's own time). 24-hour by default; change it in Settings › Clock format (24-hour, 12-hour, or follow the TV).
 - **Live weather, anywhere.** Type any city or country in Settings › Weather location (a country uses its capital). Current temperature, feels-like, high/low and a 3-day forecast (Open-Meteo, no account needed). US locations also show National Weather Service alerts.
-- **Your own backgrounds.** A built-in sunset scene, plus any photos you drop in a folder on the TV. Flip with one button or rotate every 15 minutes.
+- **Your own backgrounds, sent from your phone.** Settings › Add photos from phone shows a QR code. Scan it on the same Wi-Fi, pick photos, done. Flip with one button or rotate every 15 minutes.
+- **VPN and location pill.** Shows whether a VPN is on and the city/country your connection appears from. OK opens ProtonVPN if it's installed.
+- **HDMI inputs.** On Google TV sets with HDMI ports, an Inputs button switches sources. Hidden on streaming sticks.
+- **Accent color.** Blue, gold, green, pink, purple or white focus glow.
 - **Home button takeover.** An optional switch makes the remote's Home button and power-on open WLH Glass. Turn it off any time to get Google TV back.
 - **Sleep timer.** 15 to 120 minutes, keeps counting while you watch other apps.
 - **Screensaver.** Cycles through all your background photos (2 minutes each) with a big clock and the weather.
@@ -35,7 +41,7 @@ Tried it on another device? Open an issue with the model, Android version and wh
 
 1. On the TV, install **Downloader** (by AFTVnews) from the Play Store.
 2. In Downloader, open this link and install:
-   `https://raw.githubusercontent.com/whitecoco20/wlh-glass-updates/main/releases/wlh-glass-2.1.apk`
+   `https://raw.githubusercontent.com/whitecoco20/wlh-glass-updates/main/releases/wlh-glass-2.2.apk`
    Allow Downloader to install apps when Android asks. If Play Protect warns you, choose **Install anyway**.
 3. Open **WLH Glass** from your apps.
 
@@ -64,7 +70,9 @@ Put `.jpg`, `.png` or `.webp` files (landscape, 1920×1080 is ideal) in:
 /sdcard/Android/data/com.wlh.glass/files/backgrounds/
 ```
 
-Use a file manager on the TV, or `windows/add-backgrounds.bat`, or:
+Easiest: **Settings › Add photos from phone** and scan the QR code. The phone page shrinks photos to TV size before sending, and lists or removes photos already on the TV. The receiver only runs while that screen is open and needs the code shown on the TV.
+
+Or use a file manager on the TV, `windows/add-backgrounds.bat`, or:
 
 ```
 adb push myphoto.jpg /sdcard/Android/data/com.wlh.glass/files/backgrounds/

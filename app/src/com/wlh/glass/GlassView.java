@@ -64,7 +64,7 @@ public class GlassView extends View {
     final SharedPreferences prefs;
 
     // ---------- state ----------
-    static final int Z_NAV = 0, Z_TOP = 1, Z_HERO = 2, Z_APPS = 3, Z_QUICK = 4;
+    static final int Z_NAV = 0, Z_TOP = 1, Z_HERO = 2, Z_APPS = 3, Z_QUICK = 4, Z_RECENT = 5;
     int zone = Z_APPS, navIdx = 0, topIdx = 0, heroIdx = 0, appIdx = 0, quickIdx = 0;
     boolean showAll = false, showSettings = false;
     int allIdx = 0, allScroll = 0, setIdx = 0;
@@ -84,7 +84,24 @@ public class GlassView extends View {
     boolean otherZone() { long t = System.currentTimeMillis(); return clockZone().getOffset(t) != java.util.TimeZone.getDefault().getOffset(t); }
     // Favorites: picked on the TV (Settings > Favorites). Empty = defaults below + auto-fill.
     final List<String> favPkgs = new ArrayList<String>(); boolean favCustom = false;
-    boolean pickMode = false;
+    // All apps screen: 0 = open apps, 1 = pick favorites, 2 = hide apps
+    int allMode = 0;
+    final HashSet<String> hidden = new HashSet<String>();
+    final List<App> everything = new ArrayList<App>();   // all apps, hidden included
+    List<App> cur() { return allMode == 2 ? everything : all; }
+    // Recently opened (kept by WLH Glass, since Google TV keeps "Continue watching" to itself)
+    final List<String> recentPkgs = new ArrayList<String>();
+    final List<App> recent = new ArrayList<App>();
+    int recentIdx = 0;
+    // World clocks: up to 3 extra cities next to the main clock
+    final List<String[]> clocks = new ArrayList<String[]>();
+    // Network pill: VPN on/off and where your connection appears to come from
+    boolean vpnOn = false, vpnSeen = false; String netWhere = null; long netAt = 0; boolean netBusy = false;
+    // HDMI / TV inputs (only on Google TV sets that have them)
+    final List<String[]> inputs = new ArrayList<String[]>();
+    // Phone upload screen
+    boolean showPhone = false; PhotoServer server; QR qr; String phoneUrl; String phoneLast = null; int phoneCount = 0;
+    int setScroll = 0;
     String wTemp = null, wFeels = "", wCond = "Loading weather…", wHiLo = ""; int wCode = -1; long wAt = 0; boolean wStale = false; boolean wBusy = false;
     String[] fDay = new String[3], fHi = new String[3], fLo = new String[3]; int[] fCode = { -1, -1, -1 };
     // Backgrounds: built-in "Sunset" plus any .jpg/.png/.webp you put in
@@ -120,7 +137,7 @@ public class GlassView extends View {
     } };
     void nextBackground() {
         scanBackgrounds();
-        if (bgCount() < 2) { flash("Add photos to Android/data/com.wlh.glass/files/backgrounds"); return; }
+        if (bgCount() < 2) { openPhone(); return; }
         bgIdx = (bgIdx + 1) % bgCount();
         if (bgMode != ROTATE) bgMode = bgIdx;
         flash("Background: " + bgName(bgIdx));
@@ -161,13 +178,16 @@ public class GlassView extends View {
     final Typeface med = Typeface.create("sans-serif-medium", Typeface.NORMAL);
     final Typeface bold = Typeface.create("sans-serif", Typeface.BOLD);
     float k = 1f; // screen px per design px
-    final int ACCENT = 0xFF9FD6FF;
+    static final String[] ACCENT_NAME = { "Blue", "Gold", "Green", "Pink", "Purple", "White" };
+    static final int[] ACCENT_COLOR = { 0xFF9FD6FF, 0xFFFFD27A, 0xFF8CF0B4, 0xFFFF9FD0, 0xFFC3A6FF, 0xFFFFFFFF };
+    int accentIdx = 0;
+    int ACCENT = 0xFF9FD6FF;
 
     final String[] NAV = { "Home", "Apps", "Live TV", "Media", "Settings" };
     final String[] QUICK = { "Bluetooth", "Sound", "Picture", "Sleep", "Background", "TV settings" };
     final String[] TOP = { "Search", "Voice", "Wi-Fi" };
 
-    final Runnable tick = new Runnable() { public void run() { invalidate(); scheduleTick(); } };
+    final Runnable tick = new Runnable() { public void run() { if (!dreamMode) checkNet(false); invalidate(); scheduleTick(); } };
 
     public GlassView(Context c) {
         super(c);
@@ -181,6 +201,10 @@ public class GlassView extends View {
         placeTZ = prefs.getString("placeTZ", "");
         tzFromPlace = prefs.getBoolean("tzFromPlace", true);
         loadFavList();
+        accentIdx = Math.max(0, Math.min(ACCENT_COLOR.length - 1, prefs.getInt("accent", 0))); ACCENT = ACCENT_COLOR[accentIdx];
+        for (String x : prefs.getString("hidden", "").split(",")) if (x.length() > 0) hidden.add(x);
+        for (String x : prefs.getString("recent", "").split(",")) if (x.length() > 0) recentPkgs.add(x);
+        for (String x : prefs.getString("clocks", "").split(";;")) { String[] a = x.split("\\|"); if (a.length == 2) clocks.add(a); }
         bootStart = prefs.getBoolean("bootStart", true);
         clockMode = prefs.getInt("clock", 0);
         bgMode = prefs.getInt("bgMode", 0);
@@ -201,14 +225,14 @@ public class GlassView extends View {
         if (wStale || System.currentTimeMillis() - wAt > 15 * 60 * 1000L) fetchWeather();
         ui.removeCallbacks(wxTick); ui.postDelayed(wxTick, 30 * 60 * 1000L);
         ui.removeCallbacks(bgTick); ui.postDelayed(bgTick, 15 * 60 * 1000L);
-        if (!dreamMode) updater.checkIfDue();
+        if (!dreamMode) { updater.checkIfDue(); loadInputs(); checkNet(false); }
         else { ui.removeCallbacks(dreamTick); ui.postDelayed(dreamTick, DREAM_STEP); }
         scanBackgrounds();
         requestFocus();
         invalidate();
     }
-    void onHidden() { ui.removeCallbacks(dreamTick); ui.removeCallbacks(tick); ui.removeCallbacks(wxTick); ui.removeCallbacks(bgTick); }
-    void release() { ui.removeCallbacksAndMessages(null); if (wall != null) wall.recycle(); if (blur != null) blur.recycle(); wall = blur = null; }
+    void onHidden() { if (showPhone) closePhone(); ui.removeCallbacks(dreamTick); ui.removeCallbacks(tick); ui.removeCallbacks(wxTick); ui.removeCallbacks(bgTick); }
+    void release() { if (server != null) { server.stop(); server = null; } ui.removeCallbacksAndMessages(null); if (wall != null) wall.recycle(); if (blur != null) blur.recycle(); wall = blur = null; }
     void trim(int level) {
         if (level >= 20) { for (App a : all) if (!isFav(a.pkg)) a.icon = null; }
         if (level >= 20 && !isShown()) dropBitmaps();
@@ -232,7 +256,7 @@ public class GlassView extends View {
     void openPicker() {
         // Start from what is on the row now, so the picker shows the current favorites ticked.
         favPkgs.clear(); for (App f : favs) favPkgs.add(f.pkg);
-        showSettings = false; pickMode = true; showAll = true; allIdx = 0; allScroll = 0;
+        showSettings = false; allMode = 1; showAll = true; allIdx = 0; allScroll = 0;
     }
     void togglePick(String pkg) {
         if (favPkgs.remove(pkg)) return;
@@ -240,7 +264,7 @@ public class GlassView extends View {
         favPkgs.add(pkg);
     }
     void finishPicker() {
-        pickMode = false; showAll = false;
+        allMode = 0; showAll = false;
         if (favPkgs.isEmpty()) { prefs.edit().remove("favs").apply(); loadFavList(); flash("Favorites reset to default"); }
         else { saveFavList(); flash("Favorites saved (" + favPkgs.size() + ")"); }
         loadApps(); appIdx = 0;
@@ -267,7 +291,7 @@ public class GlassView extends View {
             App a = app(pm, pkg, true);
             if (a != null) favs.add(a);
         }
-        all.clear();
+        all.clear(); everything.clear();
         HashSet<String> seen = new HashSet<String>();
         String[] cats = { Intent.CATEGORY_LEANBACK_LAUNCHER, Intent.CATEGORY_LAUNCHER };
         for (String cat : cats) {
@@ -277,12 +301,13 @@ public class GlassView extends View {
                 String pkg = ri.activityInfo.packageName;
                 if (pkg.equals(getContext().getPackageName()) || !seen.add(pkg)) continue;
                 App a = app(pm, pkg, false);
-                if (a != null) all.add(a);
+                if (a != null) { everything.add(a); if (!hidden.contains(pkg)) all.add(a); }
             }
         }
-        Collections.sort(all, new Comparator<App>() {
+        Comparator<App> byName = new Comparator<App>() {
             public int compare(App x, App y) { return x.label.compareToIgnoreCase(y.label); }
-        });
+        };
+        Collections.sort(all, byName); Collections.sort(everything, byName);
         // Fewer than 8 of the listed favorites installed (e.g. someone else's TV)? Fill the row from the app list.
         for (App a : all) {
             if (favCustom || favs.size() >= 8) break;
@@ -290,7 +315,35 @@ public class GlassView extends View {
             if (!have && !a.pkg.startsWith("com.android.") && !a.pkg.equals("com.google.android.tv.remote.service")) { App f = new App(); f.pkg = a.pkg; f.label = a.label; f.icon = loadIcon(pm, safeInfo(pm, a.pkg)); favs.add(f); }
         }
         if (appIdx >= favs.size()) appIdx = Math.max(0, favs.size() - 1);
+        buildRecent();
     }
+
+    void buildRecent() {
+        recent.clear();
+        for (String pkg : recentPkgs) {
+            for (App a : everything) if (a.pkg.equals(pkg)) { App r = new App(); r.pkg = a.pkg; r.label = a.label; recent.add(r); break; }
+            if (recent.size() >= 6) break;
+        }
+        if (recentIdx >= recent.size()) recentIdx = Math.max(0, recent.size() - 1);
+    }
+
+    void noteLaunch(String pkg) {
+        if (pkg == null || pkg.equals(getContext().getPackageName()) || pkg.startsWith("com.android.settings") || pkg.equals("com.android.tv.settings")) return;
+        recentPkgs.remove(pkg); recentPkgs.add(0, pkg);
+        while (recentPkgs.size() > 12) recentPkgs.remove(recentPkgs.size() - 1);
+        StringBuilder b = new StringBuilder();
+        for (String x : recentPkgs) { if (b.length() > 0) b.append(','); b.append(x); }
+        prefs.edit().putString("recent", b.toString()).apply();
+        buildRecent();
+    }
+
+    void saveHidden() {
+        StringBuilder b = new StringBuilder();
+        for (String x : hidden) { if (b.length() > 0) b.append(','); b.append(x); }
+        prefs.edit().putString("hidden", b.toString()).apply();
+    }
+    void openHider() { showSettings = false; allMode = 2; showAll = true; allIdx = 0; allScroll = 0; }
+    void finishHider() { allMode = 0; showAll = false; saveHidden(); loadApps(); flash(hidden.isEmpty() ? "No hidden apps" : hidden.size() + " app" + (hidden.size() == 1 ? "" : "s") + " hidden from All apps"); }
 
     App app(PackageManager pm, String pkg, boolean withIcon) {
         try {
@@ -328,7 +381,7 @@ public class GlassView extends View {
 
     void launch(String pkg) {
         Intent i = launchIntent(getContext().getPackageManager(), pkg);
-        if (i != null) start(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        if (i != null) { start(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); noteLaunch(pkg); }
     }
 
     void start(Intent i) {
@@ -336,6 +389,122 @@ public class GlassView extends View {
         catch (ActivityNotFoundException e) {
             try { getContext().startActivity(new Intent(Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); } catch (Throwable t) { }
         } catch (Throwable t) { }
+    }
+
+    // ---------- HDMI / TV inputs ----------
+    void loadInputs() {
+        inputs.clear();
+        try {
+            android.media.tv.TvInputManager tm = (android.media.tv.TvInputManager) getContext().getSystemService(Context.TV_INPUT_SERVICE);
+            if (tm == null) return;
+            for (android.media.tv.TvInputInfo ti : tm.getTvInputList()) {
+                if (!ti.isPassthroughInput()) continue;
+                CharSequence lab = null;
+                try { lab = (CharSequence) ti.getClass().getMethod("loadCustomLabel", Context.class).invoke(ti, getContext()); } catch (Throwable t) { }
+                if (lab == null || lab.length() == 0) lab = ti.loadLabel(getContext());
+                inputs.add(new String[] { ti.getId(), String.valueOf(lab) });
+            }
+        } catch (Throwable t) { inputs.clear(); }
+    }
+    void openInput(String id) {
+        try {
+            Intent i = new Intent(Intent.ACTION_VIEW, android.media.tv.TvContract.buildChannelUriForPassthroughInput(id));
+            getContext().startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        } catch (Throwable t) { flash("This TV can't switch inputs from here"); }
+    }
+    void showInputs() {
+        loadInputs();
+        if (inputs.isEmpty()) { flash("No HDMI inputs on this device"); return; }
+        if (inputs.size() == 1) { openInput(inputs.get(0)[0]); return; }
+        String[] labels = new String[inputs.size()];
+        for (int i = 0; i < labels.length; i++) labels[i] = inputs.get(i)[1];
+        new android.app.AlertDialog.Builder(getContext(), android.R.style.Theme_DeviceDefault_Dialog_Alert)
+                .setTitle("Inputs")
+                .setItems(labels, new android.content.DialogInterface.OnClickListener() { public void onClick(android.content.DialogInterface di, int i) { openInput(inputs.get(i)[0]); } })
+                .show();
+    }
+
+    // ---------- network pill: VPN + where you appear to be ----------
+    boolean vpnActive() {
+        try {
+            android.net.ConnectivityManager cm = (android.net.ConnectivityManager) getContext().getSystemService(Context.CONNECTIVITY_SERVICE);
+            for (android.net.Network n : cm.getAllNetworks()) {
+                android.net.NetworkCapabilities nc = cm.getNetworkCapabilities(n);
+                if (nc != null && nc.hasTransport(android.net.NetworkCapabilities.TRANSPORT_VPN)) return true;
+            }
+        } catch (Throwable t) { }
+        return false;
+    }
+    void checkNet(boolean force) {
+        boolean v = vpnActive();
+        boolean changed = !vpnSeen || v != vpnOn;
+        vpnOn = v; vpnSeen = true;
+        if (netBusy || (!force && !changed && System.currentTimeMillis() - netAt < 10 * 60 * 1000L)) return;
+        netBusy = true;
+        new Thread(new Runnable() { public void run() {
+            String where = null;
+            try {
+                JSONObject j = new JSONObject(Updater.get("https://ipwho.is/?fields=success,city,country_code"));
+                if (j.optBoolean("success", false)) where = j.optString("city", "") + ", " + j.optString("country_code", "");
+            } catch (Throwable t) { }
+            if (where == null) try {
+                JSONObject j = new JSONObject(Updater.get("https://ipapi.co/json/"));
+                if (j.has("city")) where = j.optString("city", "") + ", " + j.optString("country_code", "");
+            } catch (Throwable t) { }
+            final String w = where;
+            ui.post(new Runnable() { public void run() { netBusy = false; netAt = System.currentTimeMillis(); if (w != null) netWhere = w; invalidate(); } });
+        } }).start();
+    }
+    String netText() {
+        String w = netWhere == null ? "Checking…" : netWhere;
+        if (w.startsWith(", ")) w = w.substring(2);
+        if (w.length() > 22) w = w.substring(0, 21) + "…";
+        return (vpnOn ? "VPN · " : "") + w;
+    }
+
+    // ---------- add photos from a phone ----------
+    java.io.File bgDir() { return new java.io.File(getContext().getExternalFilesDir(null), "backgrounds"); }
+    void openPhone() {
+        if (server == null) {
+            server = new PhotoServer(bgDir(), new PhotoServer.Listener() {
+                public void received(final String name) { ui.post(new Runnable() { public void run() { phoneCount++; phoneLast = name; scanBackgrounds(); invalidate(); } }); }
+                public void removed(final String name) { ui.post(new Runnable() { public void run() { phoneLast = "Removed " + name; scanBackgrounds(); invalidate(); } }); }
+            });
+            if (!server.start()) { server = null; flash("Couldn't start the photo receiver. Try again in a minute."); return; }
+        }
+        phoneUrl = server.url();
+        if (phoneUrl == null) { closePhone(); flash("Connect the TV to Wi-Fi or Ethernet first"); return; }
+        qr = QR.encode(phoneUrl);
+        phoneCount = 0; phoneLast = null; showPhone = true;
+        invalidate();
+    }
+    void closePhone() {
+        showPhone = false;
+        if (server != null) { server.stop(); server = null; }
+        qr = null;
+        scanBackgrounds(); dropBitmaps(); invalidate();
+        if (phoneCount > 0) flash(phoneCount + " photo" + (phoneCount == 1 ? "" : "s") + " added. Press Background to see them.");
+    }
+    void drawPhone(Canvas c) {
+        p.setColor(0x99060816); c.drawRect(0, 0, 1920, 1080, p);
+        glass(c, 260, 150, 1400, 780, 48, true);
+        text(c, "Add photos from your phone", 330, 250, 44, bold, Color.WHITE, Paint.Align.LEFT);
+        String[] steps = { "1.  Put your phone on the same Wi-Fi as the TV.", "2.  Point the phone camera at the code.", "3.  Tap the link and pick your photos.",
+                           "    They become backgrounds and screensaver pictures." };
+        for (int i = 0; i < steps.length; i++) text(c, steps[i], 330, 340 + i * 50, 26, reg, 0xE6FFFFFF, Paint.Align.LEFT);
+        text(c, "Or type this in the phone's browser:", 330, 590, 22, reg, 0xB3FFFFFF, Paint.Align.LEFT);
+        text(c, phoneUrl == null ? "" : phoneUrl, 330, 632, 30, med, ACCENT, Paint.Align.LEFT);
+        String st = phoneLast == null ? "Waiting for photos…" : phoneCount > 0 && !phoneLast.startsWith("Removed") ? "Received " + phoneCount + "  ·  last: " + phoneLast : phoneLast;
+        text(c, st, 330, 712, 24, med, phoneLast == null ? 0xB3FFFFFF : 0xFF8CF0B4, Paint.Align.LEFT);
+        text(c, (bgCount() - 1) + " photos on the TV  ·  Back when you're done", 330, 860, 22, reg, 0xB3FFFFFF, Paint.Align.LEFT);
+        if (qr != null) {
+            float box = 520, x0 = 1080, y0 = 270;
+            p.setColor(Color.WHITE); r.set(x0, y0, x0 + box, y0 + box); c.drawRoundRect(r, 28, 28, p);
+            float cell = (box - 56) / qr.size, ox = x0 + 28 + (box - 56 - cell * qr.size) / 2, oy = y0 + 28 + (box - 56 - cell * qr.size) / 2;
+            p.setColor(0xFF0B0D1A);
+            for (int yy = 0; yy < qr.size; yy++) for (int xx = 0; xx < qr.size; xx++)
+                if (qr.mod[yy][xx]) c.drawRect(ox + xx * cell, oy + yy * cell, ox + (xx + 1) * cell + 0.5f, oy + (yy + 1) * cell + 0.5f, p);
+        }
     }
 
     // ---------- weather location ----------
@@ -365,13 +534,42 @@ public class GlassView extends View {
         if (tz == null || tz.equals(placeTZ)) return;
         placeTZ = tz; prefs.edit().putString("placeTZ", tz).apply(); invalidate();
     }
+    void saveClocks() {
+        StringBuilder b = new StringBuilder();
+        for (String[] w : clocks) { if (b.length() > 0) b.append(";;"); b.append(w[0].replace("|", " ").replace(";", " ")).append('|').append(w[1]); }
+        prefs.edit().putString("clocks", b.toString()).apply();
+    }
+    void addClock(final Place p) {
+        if (p.tz == null || p.tz.length() == 0) {
+            new Thread(new Runnable() { public void run() { p.tz = tzFor(p.lat, p.lon); ui.post(new Runnable() { public void run() {
+                if (p.tz.length() == 0) flash("Couldn't find the time zone for " + p.name); else addClock(p); } }); } }).start();
+            return;
+        }
+        if (clocks.size() >= 3) clocks.remove(0);
+        String n = p.name.length() > 12 ? p.name.substring(0, 11) + "…" : p.name;
+        clocks.add(new String[] { n, p.tz });
+        saveClocks(); flash("Clock added: " + p.name); invalidate();
+    }
+    void manageClocks() {
+        if (!(getContext() instanceof android.app.Activity)) return;
+        final List<String> items = new ArrayList<String>();
+        for (String[] w : clocks) items.add("Remove " + w[0]);
+        if (clocks.size() < 3) items.add("+ Add a city");
+        new android.app.AlertDialog.Builder(getContext(), android.R.style.Theme_DeviceDefault_Dialog_Alert)
+                .setTitle("World clocks (up to 3)")
+                .setItems(items.toArray(new String[0]), new android.content.DialogInterface.OnClickListener() { public void onClick(android.content.DialogInterface di, int i) {
+                    if (i < clocks.size()) { clocks.remove(i); saveClocks(); invalidate(); } else askPlace(1);
+                } })
+                .setNegativeButton("Done", null).show();
+    }
+
     String placeKey() { return placeName + "|" + placeLat + "|" + placeLon; }
     String placeShort() { String n = placeName == null ? "" : placeName; return n.length() > 18 ? n.substring(0, 17) + "…" : n; }
 
     static class Place { String label, name, cc, tz; double lat, lon; }
 
     /** Opens the TV keyboard; the viewer types a city or a country, then picks from the matches. */
-    void askPlace() {
+    void askPlace(final int target) { // 0 = weather location, 1 = add a world clock
         if (!(getContext() instanceof android.app.Activity)) return;
         final android.widget.EditText in = new android.widget.EditText(getContext());
         in.setSingleLine(true);
@@ -382,12 +580,12 @@ public class GlassView extends View {
         android.widget.FrameLayout box = new android.widget.FrameLayout(getContext());
         box.setPadding(pad, pad / 2, pad, 0); box.addView(in);
         final android.app.AlertDialog d = new android.app.AlertDialog.Builder(getContext(), android.R.style.Theme_DeviceDefault_Dialog_Alert)
-                .setTitle("Weather location").setView(box)
+                .setTitle(target == 1 ? "Add a world clock" : "Weather location").setView(box)
                 .setPositiveButton("Search", null).setNegativeButton("Cancel", null).create();
         final Runnable go = new Runnable() { public void run() {
             String q = in.getText().toString().trim();
             if (q.length() < 2) return;
-            d.dismiss(); searchPlace(q);
+            d.dismiss(); searchPlace(q, target);
         } };
         in.setOnEditorActionListener(new android.widget.TextView.OnEditorActionListener() {
             public boolean onEditorAction(android.widget.TextView v, int a, KeyEvent e) { go.run(); return true; } });
@@ -399,7 +597,7 @@ public class GlassView extends View {
         d.show();
     }
 
-    void searchPlace(final String query) {
+    void searchPlace(final String query, final int target) {
         flash("Searching " + query + "…");
         new Thread(new Runnable() { public void run() {
             final List<Place> out = new ArrayList<Place>();
@@ -417,7 +615,7 @@ public class GlassView extends View {
                     if (fc.startsWith("PCL")) {
                         // A country: use its capital for the weather.
                         Place cap = capitalOf(cc, co);
-                        if (cap != null) { out.add(0, cap); continue; }
+                        if (cap != null) { if (cap.tz == null || cap.tz.length() == 0) cap.tz = tzFor(cap.lat, cap.lon); out.add(0, cap); continue; }
                     }
                     Place p = new Place();
                     p.name = nm; p.cc = cc; p.tz = o.optString("timezone", ""); p.lat = o.getDouble("latitude"); p.lon = o.getDouble("longitude");
@@ -429,7 +627,7 @@ public class GlassView extends View {
                     if (out.size() >= 8) break;
                 }
             } catch (Throwable t) { }
-            ui.post(new Runnable() { public void run() { showPlaces(query, out); } });
+            ui.post(new Runnable() { public void run() { showPlaces(query, out, target); } });
         } }).start();
     }
 
@@ -455,17 +653,23 @@ public class GlassView extends View {
         }
     }
 
-    void showPlaces(String query, final List<Place> list) {
+    /** Time zone for a spot on the map (Open-Meteo works it out). */
+    static String tzFor(double lat, double lon) {
+        try { return new JSONObject(Updater.get("https://api.open-meteo.com/v1/forecast?latitude=" + lat + "&longitude=" + lon + "&current=temperature_2m&timezone=auto")).optString("timezone", ""); }
+        catch (Throwable t) { return ""; }
+    }
+
+    void showPlaces(String query, final List<Place> list, final int target) {
         if (list.isEmpty()) { flash("No place found for \"" + query + "\". Try another spelling."); return; }
         if (!(getContext() instanceof android.app.Activity) || ((android.app.Activity) getContext()).isFinishing()) return;
         String[] labels = new String[list.size()];
         for (int i = 0; i < labels.length; i++) labels[i] = list.get(i).label;
         new android.app.AlertDialog.Builder(getContext(), android.R.style.Theme_DeviceDefault_Dialog_Alert)
-                .setTitle("Pick your location")
+                .setTitle(target == 1 ? "Pick the city for the clock" : "Pick your location")
                 .setItems(labels, new android.content.DialogInterface.OnClickListener() { public void onClick(android.content.DialogInterface di, int i) {
-                    Place p = list.get(i); setPlace(p.name, p.lat, p.lon, p.cc, p.tz);
+                    Place p = list.get(i); if (target == 1) addClock(p); else setPlace(p.name, p.lat, p.lon, p.cc, p.tz);
                 } })
-                .setNegativeButton("Search again", new android.content.DialogInterface.OnClickListener() { public void onClick(android.content.DialogInterface di, int i) { askPlace(); } })
+                .setNegativeButton("Search again", new android.content.DialogInterface.OnClickListener() { public void onClick(android.content.DialogInterface di, int i) { askPlace(target); } })
                 .show();
     }
 
@@ -587,6 +791,7 @@ public class GlassView extends View {
         int dy = code == KeyEvent.KEYCODE_DPAD_UP ? -1 : code == KeyEvent.KEYCODE_DPAD_DOWN ? 1 : 0;
         if (!ok && !back && dx == 0 && dy == 0) return false;
 
+        if (showPhone) { if (back || ok) closePhone(); return true; }
         if (showSettings) { settingsKey(ok, back, dx, dy); invalidate(); return true; }
         if (showAll) { allKey(ok, back, dx, dy); invalidate(); return true; }
         if (showWatch) { watchKey(ok, back, dx, dy); invalidate(); return true; }
@@ -598,16 +803,26 @@ public class GlassView extends View {
                 else if (dx > 0) zone = Z_APPS;
                 else if (ok) navAction(navIdx);
                 break;
-            case Z_TOP:
-                if (dx != 0) { int n = topIdx + dx; if (n < 0) zone = Z_HERO; else topIdx = clamp(n, 0, TOP.length - 1); }
+            case Z_TOP: {
+                List<String> T = topItems();
+                if (dx != 0) { int n = topIdx + dx; if (n < 0) zone = recent.isEmpty() ? Z_HERO : Z_RECENT; else topIdx = clamp(n, 0, T.size() - 1); }
+                else if (dy > 0) zone = recent.isEmpty() ? Z_HERO : Z_RECENT;
+                else if (ok) topAction(T.get(clamp(topIdx, 0, T.size() - 1)));
+                break;
+            }
+            case Z_RECENT:
+                if (recent.isEmpty()) { zone = Z_HERO; break; }
+                if (dx < 0) { if (recentIdx > 0) recentIdx--; else zone = Z_NAV; }
+                else if (dx > 0) recentIdx = clamp(recentIdx + 1, 0, recent.size() - 1);
                 else if (dy > 0) zone = Z_HERO;
-                else if (ok) topAction(topIdx);
+                else if (dy < 0) zone = Z_TOP;
+                else if (ok) launch(recent.get(recentIdx).pkg);
                 break;
             case Z_HERO:
                 if (dx < 0) { if (heroIdx > 0) heroIdx--; else zone = Z_NAV; }
-                else if (dx > 0) { if (heroIdx < 1) heroIdx++; else zone = Z_TOP; }
+                else if (dx > 0) { if (heroIdx < 1) heroIdx++; else { zone = Z_TOP; topIdx = 0; } }
                 else if (dy > 0) zone = Z_APPS;
-                else if (dy < 0) zone = Z_TOP;
+                else if (dy < 0) zone = recent.isEmpty() ? Z_TOP : Z_RECENT;
                 else if (ok) { if (heroIdx == 0) openSelected(); else openAll(); }
                 break;
             case Z_APPS:
@@ -640,9 +855,22 @@ public class GlassView extends View {
         else { showSettings = true; setIdx = 0; }
     }
 
-    void topAction(int i) {
-        if (i == 0) start(new Intent("android.search.action.GLOBAL_SEARCH"));
-        else if (i == 1) start(new Intent(Intent.ACTION_ASSIST));
+    List<String> topItems() {
+        List<String> t = new ArrayList<String>();
+        t.add("Search"); t.add("Voice");
+        if (!inputs.isEmpty()) t.add("Inputs");
+        t.add("Net"); t.add("Wi-Fi");
+        return t;
+    }
+    void topAction(String n) {
+        if (n.equals("Search")) start(new Intent("android.search.action.GLOBAL_SEARCH"));
+        else if (n.equals("Voice")) start(new Intent(Intent.ACTION_ASSIST));
+        else if (n.equals("Inputs")) showInputs();
+        else if (n.equals("Net")) {
+            PackageManager pm = getContext().getPackageManager();
+            if (launchIntent(pm, "ch.protonvpn.android") != null) launch("ch.protonvpn.android");
+            else { flash("Checking your connection…"); checkNet(true); }
+        }
         else start(new Intent(Settings.ACTION_WIFI_SETTINGS));
     }
 
@@ -755,54 +983,79 @@ public class GlassView extends View {
 
     static final int ALL_COLS = 7;
     void allKey(boolean ok, boolean back, int dx, int dy) {
-        if (back) { if (pickMode) finishPicker(); else closeAll(); return; }
-        int n = all.size(); if (n == 0) return;
+        if (back) { if (allMode == 1) finishPicker(); else if (allMode == 2) finishHider(); else closeAll(); return; }
+        List<App> L = cur();
+        int n = L.size(); if (n == 0) return;
         if (dx != 0) allIdx = clamp(allIdx + dx, 0, n - 1);
         if (dy != 0) { int t = allIdx + dy * ALL_COLS; if (t >= 0 && t < n) allIdx = t; else if (dy > 0) allIdx = n - 1; }
-        if (ok) { if (pickMode) togglePick(all.get(allIdx).pkg); else { launch(all.get(allIdx).pkg); closeAll(); } }
+        if (ok) {
+            String pkg = L.get(allIdx).pkg;
+            if (allMode == 1) togglePick(pkg);
+            else if (allMode == 2) { if (!hidden.remove(pkg)) hidden.add(pkg); }
+            else { launch(pkg); closeAll(); }
+        }
         int row = allIdx / ALL_COLS;
         if (row < allScroll) allScroll = row;
         if (row > allScroll + 2) allScroll = row - 2;
     }
-
-    static final String[] SET_LABELS = { "Home button", "Favorites", "Background", "Clock format", "Clock time zone", "Low power mode", "Glass blur", "Temperature", "Weather location", "Open when TV starts", "App update", "Android TV settings" };
+    static final String[] SET_LABELS = { "Home button", "Favorites", "Hide apps", "Background", "Add photos from phone", "Clock format", "Clock time zone", "World clocks",
+            "Accent color", "Low power mode", "Glass blur", "Temperature", "Weather location", "Open when TV starts", "App update", "Android TV settings" };
+    static final int SET_ROWS = 12;
     void settingsKey(boolean ok, boolean back, int dx, int dy) {
         if (back) { showSettings = false; return; }
-        if (dy != 0) { setIdx = clamp(setIdx + dy, 0, SET_LABELS.length - 1); return; }
+        if (dy != 0) {
+            setIdx = clamp(setIdx + dy, 0, SET_LABELS.length - 1);
+            if (setIdx < setScroll) setScroll = setIdx;
+            if (setIdx >= setScroll + SET_ROWS) setScroll = setIdx - SET_ROWS + 1;
+            return;
+        }
         if (!ok && dx == 0) return;
         int step = dx == 0 ? 1 : dx;
         SharedPreferences.Editor e = prefs.edit();
-        switch (setIdx) {
-            case 0: if (ok) { if (homeServiceOn() && HomeKeyService.switchToGoogleTv(getContext())) showSettings = false; else start(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)); } break;
-            case 1: if (ok) { e.apply(); openPicker(); return; } break;
-            case 2: { scanBackgrounds(); int n = bgCount() + 1, cur = bgMode == ROTATE ? n - 1 : bgMode; cur = (cur + step + n) % n;
+        switch (SET_LABELS[setIdx]) {
+            case "Home button": if (ok) { if (homeServiceOn() && HomeKeyService.switchToGoogleTv(getContext())) showSettings = false; else start(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)); } break;
+            case "Favorites": if (ok) { e.apply(); openPicker(); return; } break;
+            case "Hide apps": if (ok) { e.apply(); openHider(); return; } break;
+            case "Background": { scanBackgrounds(); int n = bgCount() + 1, cur = bgMode == ROTATE ? n - 1 : bgMode; cur = (cur + step + n) % n;
                       bgMode = cur == n - 1 ? ROTATE : cur; if (bgMode != ROTATE) bgIdx = bgMode; e.putInt("bgMode", bgMode).putInt("bgIdx", bgIdx); dropBitmaps(); break; }
-            case 3: clockMode = (clockMode + step + 3) % 3; e.putInt("clock", clockMode); break;
-            case 4: tzFromPlace = !tzFromPlace; e.putBoolean("tzFromPlace", tzFromPlace); break;
-            case 5: lowPower = !lowPower; e.putBoolean("lowPower", lowPower); dropBitmaps(); break;
-            case 6: blurLevel = (blurLevel + step + 3) % 3; e.putInt("blur", blurLevel); dropBitmaps(); break;
-            case 7: celsius = !celsius; e.putBoolean("celsius", celsius); clearWeather(); fetchWeather(); break;
-            case 8: if (ok) { e.apply(); askPlace(); } break;
-            case 9: bootStart = !bootStart; e.putBoolean("bootStart", bootStart); break;
-            case 10: if (ok) { if (updater.updateReady()) updater.install(); else updater.check(); } break;
-            case 11: if (ok) start(new Intent(Settings.ACTION_SETTINGS)); break;
+            case "Add photos from phone": if (ok) { e.apply(); showSettings = false; openPhone(); return; } break;
+            case "Clock format": clockMode = (clockMode + step + 3) % 3; e.putInt("clock", clockMode); break;
+            case "Clock time zone": tzFromPlace = !tzFromPlace; e.putBoolean("tzFromPlace", tzFromPlace); break;
+            case "World clocks": if (ok) { e.apply(); manageClocks(); return; } break;
+            case "Accent color": accentIdx = (accentIdx + step + ACCENT_COLOR.length) % ACCENT_COLOR.length; ACCENT = ACCENT_COLOR[accentIdx]; e.putInt("accent", accentIdx); break;
+            case "Low power mode": lowPower = !lowPower; e.putBoolean("lowPower", lowPower); dropBitmaps(); break;
+            case "Glass blur": blurLevel = (blurLevel + step + 3) % 3; e.putInt("blur", blurLevel); dropBitmaps(); break;
+            case "Temperature": celsius = !celsius; e.putBoolean("celsius", celsius); clearWeather(); fetchWeather(); break;
+            case "Weather location": if (ok) { e.apply(); askPlace(0); } break;
+            case "Open when TV starts": bootStart = !bootStart; e.putBoolean("bootStart", bootStart); break;
+            case "App update": if (ok) { if (updater.updateReady()) updater.install(); else updater.check(); } break;
+            case "Android TV settings": if (ok) start(new Intent(Settings.ACTION_SETTINGS)); break;
         }
         e.apply();
     }
 
     String setValue(int i) {
-        switch (i) {
-            case 0: return homeServiceOn() ? "WLH Glass — OK switches to Google TV" : "Google TV — OK, then turn on WLH Glass Home button";
-            case 1: return (favCustom ? favPkgs.size() + " picked" : "Default") + " — OK to pick";
-            case 2: return bgMode != ROTATE ? bgName(bgMode) : "Rotate every 15 min (now " + bgName(bgIdx) + ")";
-            case 3: return clockMode == 0 ? "24-hour" : clockMode == 1 ? "12-hour" : "Follow TV (" + (DateFormat.is24HourFormat(getContext()) ? "24-hour" : "12-hour") + ")";
-            case 4: return tzFromPlace ? "Weather location (" + (placeTZ.length() > 0 ? placeTZ.replace('_', ' ') : "loading") + ")" : "TV time";
-            case 5: return lowPower ? "On" : "Off";
-            case 6: return blurLevel == 0 ? "Light" : blurLevel == 1 ? "Medium" : "Strong";
-            case 7: return celsius ? "°C" : "°F";
-            case 8: return placeShort() + " — OK to change";
-            case 9: return bootStart ? "On" : "Off";
-            case 10: {
+        switch (SET_LABELS[i]) {
+            case "Home button": return homeServiceOn() ? "WLH Glass — OK switches to Google TV" : "Google TV — OK, then turn on WLH Glass Home button";
+            case "Favorites": return (favCustom ? favPkgs.size() + " picked" : "Default") + " — OK to pick";
+            case "Hide apps": return (hidden.isEmpty() ? "None hidden" : hidden.size() + " hidden") + " — OK to choose";
+            case "Background": return bgMode != ROTATE ? bgName(bgMode) : "Rotate every 15 min (now " + bgName(bgIdx) + ")";
+            case "Add photos from phone": return (bgCount() - 1) + " photo" + (bgCount() == 2 ? "" : "s") + " — OK to show QR code";
+            case "Clock format": return clockMode == 0 ? "24-hour" : clockMode == 1 ? "12-hour" : "Follow TV (" + (DateFormat.is24HourFormat(getContext()) ? "24-hour" : "12-hour") + ")";
+            case "Clock time zone": return tzFromPlace ? "Weather location (" + (placeTZ.length() > 0 ? placeTZ.replace('_', ' ') : "loading") + ")" : "TV time";
+            case "World clocks": {
+                if (clocks.isEmpty()) return "None — OK to add";
+                StringBuilder b = new StringBuilder();
+                for (String[] w : clocks) { if (b.length() > 0) b.append(", "); b.append(w[0]); }
+                return b + " — OK to change";
+            }
+            case "Accent color": return ACCENT_NAME[accentIdx];
+            case "Low power mode": return lowPower ? "On" : "Off";
+            case "Glass blur": return blurLevel == 0 ? "Light" : blurLevel == 1 ? "Medium" : "Strong";
+            case "Temperature": return celsius ? "°C" : "°F";
+            case "Weather location": return placeShort() + " — OK to change";
+            case "Open when TV starts": return bootStart ? "On" : "Off";
+            case "App update": {
                 if (updater.state.length() > 0) return updater.state;
                 if (updater.updateReady()) return "Version " + updater.latestName() + " ready — OK to install";
                 return "Up to date (" + updater.myName() + ") — OK to check";
@@ -968,7 +1221,7 @@ public class GlassView extends View {
     void focusRing(Canvas c, float x, float y, float w, float h, float rad) {
         r.set(x - 4, y - 4, x + w + 4, y + h + 4);
         if (!lowPower) {
-            sp.setColor(0x449FD6FF); sp.setStrokeWidth(16f);
+            sp.setColor((ACCENT & 0x00FFFFFF) | 0x44000000); sp.setStrokeWidth(16f);
             c.drawRoundRect(r, rad + 4, rad + 4, sp);
         }
         sp.setColor(ACCENT); sp.setStrokeWidth(4f);
@@ -1003,6 +1256,7 @@ public class GlassView extends View {
         else if (name.equals("Picture")) { g.addCircle(cx, cy, 8*u, Path.Direction.CW); g.moveTo(cx, cy - 8*u); g.lineTo(cx, cy + 8*u); }
         else if (name.equals("Sleep")) { g.addArc(new RectF(ox+4*u, oy+4*u, ox+20*u, oy+20*u), 60, 250); g.addArc(new RectF(ox+9*u, oy+2*u, ox+21*u, oy+14*u), 120, 150); }
         else if (name.equals("Watching")) { g.addCircle(cx, cy, 9*u, Path.Direction.CW); g.moveTo(cx-2.5f*u, cy-4*u); g.lineTo(cx+4.5f*u, cy); g.lineTo(cx-2.5f*u, cy+4*u); g.close(); }
+        else if (name.equals("Inputs")) { g.addRoundRect(new RectF(ox+3*u, oy+5*u, ox+21*u, oy+17*u), 2*u, 2*u, Path.Direction.CW); g.moveTo(ox+8*u, oy+21*u); g.lineTo(ox+16*u, oy+21*u); g.moveTo(ox+8*u, oy+11*u); g.lineTo(ox+15*u, oy+11*u); g.moveTo(ox+12*u, oy+8*u); g.lineTo(ox+15*u, oy+11*u); g.lineTo(ox+12*u, oy+14*u); }
         else if (name.equals("Search")) { g.addCircle(ox+11*u, oy+11*u, 7*u, Path.Direction.CW); g.moveTo(ox+16*u, oy+16*u); g.lineTo(ox+20*u, oy+20*u); }
         else if (name.equals("Voice")) { g.addRoundRect(new RectF(ox+9*u, oy+3*u, ox+15*u, oy+14*u), 3*u, 3*u, Path.Direction.CW); g.addArc(new RectF(ox+5*u, oy+4*u, ox+19*u, oy+18*u), 0, 180); g.moveTo(cx, oy+18*u); g.lineTo(cx, oy+21*u); }
         else if (name.equals("Wi-Fi")) { g.addArc(new RectF(ox+2*u, oy+4*u, ox+22*u, oy+24*u), 225, 90); g.addArc(new RectF(ox+5.5f*u, oy+8*u, ox+18.5f*u, oy+21*u), 225, 90); g.addArc(new RectF(ox+9*u, oy+12*u, ox+15*u, oy+18*u), 225, 90); g.addCircle(cx, oy+19.5f*u, 0.8f*u, Path.Direction.CW); }
@@ -1036,19 +1290,50 @@ public class GlassView extends View {
         }
 
         // top right: search, voice, wi-fi
-        float tx = 1848;
-        float wifiW = 26 * 2 + 26 + 12 + measure("Wi-Fi", 22, med);
-        float[] topX = { tx - wifiW - 20 - 68 - 20 - 68, tx - wifiW - 20 - 68, tx - wifiW };
-        float[] topW = { 68, 68, wifiW };
-        for (int i = 0; i < 3; i++) {
-            glass(c, topX[i], 64, topW[i], 68, 34, false);
-            if (zone == Z_TOP && topIdx == i) focusRing(c, topX[i], 64, topW[i], 68, 34);
-            if (i < 2) glyph(c, TOP[i], topX[i] + 34, 98, 28, Color.WHITE);
-            else { glyph(c, "Wi-Fi", topX[i] + 26 + 13, 98, 26, Color.WHITE); text(c, "Wi-Fi", topX[i] + 26 + 26 + 12, 106, 22, med, Color.WHITE, Paint.Align.LEFT); }
+        List<String> T = topItems();
+        float[] tw = new float[T.size()];
+        float total = 0;
+        for (int i = 0; i < T.size(); i++) {
+            String n = T.get(i);
+            if (n.equals("Search") || n.equals("Voice")) tw[i] = 68;
+            else if (n.equals("Net")) tw[i] = 26 * 2 + 14 + 12 + measure(netText(), 22, med);
+            else tw[i] = 26 * 2 + 26 + 12 + measure(n, 22, med);
+            total += tw[i] + (i > 0 ? 20 : 0);
+        }
+        float tx = 1848 - total;
+        for (int i = 0; i < T.size(); i++) {
+            String n = T.get(i);
+            glass(c, tx, 64, tw[i], 68, 34, false);
+            if (zone == Z_TOP && topIdx == i) focusRing(c, tx, 64, tw[i], 68, 34);
+            if (tw[i] == 68) glyph(c, n, tx + 34, 98, 28, Color.WHITE);
+            else if (n.equals("Net")) {
+                p.setColor(vpnOn ? 0xFF8CF0B4 : 0x99FFFFFF); c.drawCircle(tx + 26 + 7, 98, 7, p);
+                text(c, netText(), tx + 26 + 14 + 12, 106, 22, med, Color.WHITE, Paint.Align.LEFT);
+            } else { glyph(c, n, tx + 26 + 13, 98, 26, Color.WHITE); text(c, n, tx + 26 + 26 + 12, 106, 22, med, Color.WHITE, Paint.Align.LEFT); }
+            tx += tw[i] + 20;
+        }
+
+        // world clocks
+        for (int i = 0; i < clocks.size(); i++) {
+            float x = 440 + i * 190;
+            SimpleDateFormat wf = new SimpleDateFormat(h24 ? "HH:mm" : "h:mm a", Locale.getDefault());
+            wf.setTimeZone(java.util.TimeZone.getTimeZone(clocks.get(i)[1]));
+            text(c, clocks.get(i)[0], x, 92, 18, med, 0xCCFFFFFF, Paint.Align.LEFT);
+            text(c, wf.format(now), x, 134, 36, light, Color.WHITE, Paint.Align.LEFT);
         }
 
         // hero
         glass(c, 440, 190, 1000, 400, 44, false);
+        if (!recent.isEmpty()) {
+            text(c, "Recently opened", 496, 236, 18, med, 0xCCFFFFFF, Paint.Align.LEFT);
+            for (int i = 0; i < recent.size(); i++) {
+                float rx = 496 + i * 96, ry = 250;
+                glass(c, rx, ry, 76, 76, 22, true);
+                if (zone == Z_RECENT && recentIdx == i) focusRing(c, rx, ry, 76, 76, 22);
+                icon(c, iconFor(recent.get(i)), rx + 12, ry + 12, 52);
+            }
+            if (zone == Z_RECENT && recentIdx < recent.size()) text(c, recent.get(recentIdx).label, 496, 360, 20, med, Color.WHITE, Paint.Align.LEFT);
+        }
         App sel = appIdx < favs.size() ? favs.get(appIdx) : null;
         if (sel != null) {
             glass(c, 1216, 246, 168, 168, 42, true);
@@ -1131,6 +1416,7 @@ public class GlassView extends View {
         if (showAll) drawAll(c);
         if (showWatch) drawWatch(c);
         if (showSettings) drawSettings(c);
+        if (showPhone) drawPhone(c);
         if (msg != null && System.currentTimeMillis() < msgUntil) {
             float mw = measure(msg, 24, med) + 72;
             glass(c, 960 - mw / 2, 40, mw, 64, 32, true);
@@ -1192,34 +1478,42 @@ public class GlassView extends View {
     void drawAll(Canvas c) {
         p.setColor(0x99060816); c.drawRect(0, 0, 1920, 1080, p);
         glass(c, 120, 90, 1680, 900, 48, true);
-        if (pickMode) {
+        List<App> L = cur();
+        if (allMode == 1) {
             text(c, "Pick favorites  " + favPkgs.size() + "/8", 180, 170, 44, bold, Color.WHITE, Paint.Align.LEFT);
             text(c, "OK adds or removes  ·  Order = the order you pick  ·  Back saves", 1740, 170, 22, reg, 0xCCFFFFFF, Paint.Align.RIGHT);
+        } else if (allMode == 2) {
+            text(c, "Hide apps  " + hidden.size() + " hidden", 180, 170, 44, bold, Color.WHITE, Paint.Align.LEFT);
+            text(c, "OK hides or shows  ·  Apps stay installed  ·  Back saves", 1740, 170, 22, reg, 0xCCFFFFFF, Paint.Align.RIGHT);
         } else {
             text(c, "All apps", 180, 170, 44, bold, Color.WHITE, Paint.Align.LEFT);
-            text(c, all.size() + " apps  ·  Back to close", 1740, 170, 22, reg, 0xCCFFFFFF, Paint.Align.RIGHT);
+            text(c, L.size() + " apps  ·  Back to close", 1740, 170, 22, reg, 0xCCFFFFFF, Paint.Align.RIGHT);
         }
         float tile = 160, gapX = 66, gapY = 92;
-        for (int i = 0; i < all.size(); i++) {
+        for (int i = 0; i < L.size(); i++) {
             int row = i / ALL_COLS - allScroll, col = i % ALL_COLS;
             if (row < 0 || row > 2) continue;
             float x = 180 + col * (tile + gapX), y = 230 + row * (tile + gapY);
+            boolean hid = allMode == 2 && hidden.contains(L.get(i).pkg);
             glass(c, x, y, tile, tile, 38, false);
             if (i == allIdx) focusRing(c, x, y, tile, tile, 38);
-            icon(c, iconFor(all.get(i)), x + 28, y + 28, tile - 56);
-            if (pickMode) {
-                int pos = favPkgs.indexOf(all.get(i).pkg);
+            icon(c, iconFor(L.get(i)), x + 28, y + 28, tile - 56);
+            if (hid) {
+                p.setColor(0xB3060816); r.set(x, y, x + tile, y + tile); c.drawRoundRect(r, 38, 38, p);
+                text(c, "Hidden", x + tile / 2, y + tile / 2 + 9, 24, bold, 0xFFFFC27A, Paint.Align.CENTER);
+            }
+            if (allMode == 1) {
+                int pos = favPkgs.indexOf(L.get(i).pkg);
                 if (pos >= 0) {
                     p.setColor(0xFF2F7BFF); c.drawCircle(x + tile - 14, y + 14, 22, p);
                     text(c, String.valueOf(pos + 1), x + tile - 14, y + 23, 24, bold, Color.WHITE, Paint.Align.CENTER);
                 }
             }
-            String lab = all.get(i).label;
+            String lab = L.get(i).label;
             if (measure(lab, 20, med) > tile + 50) lab = lab.substring(0, Math.min(lab.length(), 14)) + "…";
-            text(c, lab, x + tile / 2, y + tile + 34, 20, med, Color.WHITE, Paint.Align.CENTER);
+            text(c, lab, x + tile / 2, y + tile + 34, 20, med, hid ? 0x99FFFFFF : Color.WHITE, Paint.Align.CENTER);
         }
     }
-
     void drawWatch(Canvas c) {
         p.setColor(0x99060816); c.drawRect(0, 0, 1920, 1080, p);
         glass(c, 120, 90, 1680, 900, 48, true);
@@ -1249,11 +1543,16 @@ public class GlassView extends View {
         glass(c, 460, 120, 1000, 840, 48, true);
         text(c, "WLH Glass settings", 520, 200, 40, bold, Color.WHITE, Paint.Align.LEFT);
         text(c, "OK or ← → to change  ·  Back to close", 1400, 200, 20, reg, 0xCCFFFFFF, Paint.Align.RIGHT);
-        for (int i = 0; i < SET_LABELS.length; i++) {
-            float y = 230 + i * 60;
+        for (int i = setScroll; i < SET_LABELS.length && i < setScroll + SET_ROWS; i++) {
+            float y = 230 + (i - setScroll) * 60;
             if (i == setIdx) { p.setColor(0x2EFFFFFF); r.set(500, y, 1420, y + 52); c.drawRoundRect(r, 18, 18, p); focusRing(c, 500, y, 920, 52, 18); }
             text(c, SET_LABELS[i], 540, y + 34, 22, med, Color.WHITE, Paint.Align.LEFT);
-            text(c, setValue(i), 1384, y + 34, 20, reg, 0xE0FFFFFF, Paint.Align.RIGHT);
+            String v = setValue(i);
+            while (v.length() > 10 && measure(v, 20, reg) > 600) v = v.substring(0, v.length() - 2);
+            if (!v.equals(setValue(i))) v += "…";
+            text(c, v, 1384, y + 34, 20, reg, 0xE0FFFFFF, Paint.Align.RIGHT);
         }
+        if (setScroll > 0) text(c, "▲ more", 960, 226, 18, med, 0xB3FFFFFF, Paint.Align.CENTER);
+        if (setScroll + SET_ROWS < SET_LABELS.length) text(c, "▼ more", 960, 948, 18, med, 0xB3FFFFFF, Paint.Align.CENTER);
     }
 }
