@@ -1,5 +1,7 @@
 # WLH Glass
 
+**Downloader code: 3985133**
+
 A fast, ad-free "liquid glass" home screen for Google TV and Android TV boxes. No root. Nothing on your TV gets turned off.
 
 ![WLH Glass home screen](docs/screenshot.jpg)
@@ -40,8 +42,8 @@ Tried it on another device? Open an issue with the model, Android version and wh
 ## Install (no PC needed)
 
 1. On the TV, install **Downloader** (by AFTVnews) from the Play Store.
-2. In Downloader, open this link and install:
-   `https://raw.githubusercontent.com/whitecoco20/wlh-glass-updates/main/releases/wlh-glass-2.3.apk`
+2. In Downloader, type the code **3985133** and press Go. It always downloads the newest version.
+   (Long link, if you need it: `https://raw.githubusercontent.com/whitecoco20/wlh-glass-updates/main/releases/wlh-glass-latest.apk`, or `aftv.news/3985133` in any browser.)
    Allow Downloader to install apps when Android asks. If Play Protect warns you, choose **Install anyway**.
 3. Open **WLH Glass** from your apps.
 
