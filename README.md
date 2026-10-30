@@ -47,6 +47,17 @@ Tried it on another device? Open an issue with the model, Android version and wh
    Allow Downloader to install apps when Android asks. If Play Protect warns you, choose **Install anyway**.
 3. Open **WLH Glass** from your apps.
 
+### "Install blocked" or "Play Protect is protecting you"
+
+WLH Glass isn't on the Play Store, so Android warns you the first time. Two separate switches can block it:
+
+1. **Downloader isn't allowed to install apps.** TV Settings › Apps › Security & restrictions › Unknown sources (on some TVs: Settings › Privacy › Security & restrictions) › turn **Downloader** on.
+2. **Play Protect blocks it.** On the warning, choose **More details › Install anyway**. If there's no "Install anyway":
+   Play Store › your profile icon › Play Protect › gear icon › turn off **Scan apps with Play Protect**, install WLH Glass, then turn it back on.
+   WLH Glass keeps working after you turn Play Protect back on.
+
+Some TVs show a second warning when you turn on the Home button switch (accessibility). That's the same rule; choose **Allow** or follow the "restricted setting" step below.
+
 ### Install from a Windows PC instead
 
 See [`windows/install.bat`](windows/install.bat). You need Google's platform-tools (adb), USB debugging turned on in the TV's Developer options, and your TV's IP address.
