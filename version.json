@@ -1,6 +1,6 @@
 {
-  "versionCode": 16,
-  "versionName": "2.3",
-  "apk": "https://raw.githubusercontent.com/whitecoco20/wlh-glass-updates/main/releases/wlh-glass-2.3.apk",
-  "notes": "VPN pill updates the moment a VPN connects or drops, and shows the provider your connection comes from."
+  "versionCode": 17,
+  "versionName": "2.4",
+  "apk": "https://raw.githubusercontent.com/whitecoco20/wlh-glass-updates/main/releases/wlh-glass-2.4.apk",
+  "notes": "Amazon Fire TV support. Clear message when an app on the side menu isn't installed."
 }

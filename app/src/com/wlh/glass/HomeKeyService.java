@@ -36,7 +36,10 @@ public class HomeKeyService extends AccessibilityService {
             Intent h = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
                     .setPackage("com.google.android.apps.tv.launcherx").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             c.startActivity(h);
-        } catch (Throwable t) { }
+        } catch (Throwable t) {
+            // Not Google TV: try Amazon's Fire TV home.
+            try { c.startActivity(new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).setPackage("com.amazon.tv.launcher").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); } catch (Throwable ignored) { }
+        }
         return true;
     }
 

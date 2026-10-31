@@ -1,8 +1,8 @@
 # WLH Glass
 
-**Downloader code: 3985133**
+**Downloader code: 3985133** (Google TV, Android TV, Fire TV)  ·  **No Android TV? Use [WLH Glass Web](https://whitecoco20.github.io/wlh-glass-updates/)** in any TV or computer browser.
 
-A fast, ad-free "liquid glass" home screen for Google TV and Android TV boxes. No root. Nothing on your TV gets turned off.
+A fast, ad-free "liquid glass" home screen for Google TV, Android TV and Amazon Fire TV. No root. Nothing on your TV gets turned off.
 
 ![WLH Glass home screen](docs/screenshot.jpg)
 
@@ -33,11 +33,21 @@ Built and tested on an **onn. Full HD Streaming Device** (Google TV, Android 14)
 | onn. Full HD Streaming Device (Google TV, Android 14) | Tested, works |
 | Other Google TV devices (Chromecast with Google TV, onn 4K, TCL/Hisense/Sony Google TV sets) | Should work (Android 9+) |
 | Android TV boxes (Nvidia Shield, Xiaomi Mi Box, generic Android TV) | Should work. Some let you pick WLH Glass as the default home directly |
-| Fire TV, Roku, Samsung Tizen, LG webOS, Apple TV | Not supported (not Android TV) |
+| Amazon Fire TV (Fire OS 6 or newer, 2017+ devices) | Runs as an app. Install with Downloader code 3985133. Amazon may block the Home button switch on newer Fire TVs, so open WLH Glass from Your Apps (pin it to the front row) |
+| Samsung (Tizen), LG (webOS), Roku, any computer | Use **WLH Glass Web** in the TV's browser (below) |
+| Apple TV | Not supported |
 
 Requires Android 9 or newer for the sleep timer. The home screen itself runs on Android 6+.
 
 Tried it on another device? Open an issue with the model, Android version and what worked.
+
+## WLH Glass Web (any browser)
+
+**https://whitecoco20.github.io/wlh-glass-updates/**
+
+Open it in the web browser on a Samsung, LG or Roku TV, on a computer, or on a tablet. You get the glass look, the clock (24-hour or 12-hour, following your weather location's time zone), weather for any city or country with US alerts, world clocks, tiles for your favorite sites, background scenes or your own photos (computers and phones), accent colors and a screensaver. Arrow keys and the remote's Back button work. Settings stay in that browser. A web page can't open TV apps, so the tiles open websites. Press **Full screen** for the best look.
+
+The page is `docs/index.html` in this repo: one file, no build step.
 
 ## Install (no PC needed)
 

@@ -102,6 +102,9 @@ public class GlassView extends View {
     // Phone upload screen
     boolean showPhone = false; PhotoServer server; QR qr; String phoneUrl; String phoneLast = null; int phoneCount = 0;
     int setScroll = 0;
+    // Amazon Fire TV: same app, but Amazon's own home, search and voice.
+    boolean fireTv = false;
+    String homeName() { return fireTv ? "Fire TV" : "Google TV"; }
     String wTemp = null, wFeels = "", wCond = "Loading weather…", wHiLo = ""; int wCode = -1; long wAt = 0; boolean wStale = false; boolean wBusy = false;
     String[] fDay = new String[3], fHi = new String[3], fLo = new String[3]; int[] fCode = { -1, -1, -1 };
     // Backgrounds: built-in "Sunset" plus any .jpg/.png/.webp you put in
@@ -200,6 +203,7 @@ public class GlassView extends View {
         loadPlace();
         placeTZ = prefs.getString("placeTZ", "");
         tzFromPlace = prefs.getBoolean("tzFromPlace", true);
+        try { fireTv = c.getPackageManager().hasSystemFeature("amazon.hardware.fire_tv") || "Amazon".equalsIgnoreCase(android.os.Build.MANUFACTURER); } catch (Throwable t) { }
         loadFavList();
         accentIdx = Math.max(0, Math.min(ACCENT_COLOR.length - 1, prefs.getInt("accent", 0))); ACCENT = ACCENT_COLOR[accentIdx];
         for (String x : prefs.getString("hidden", "").split(",")) if (x.length() > 0) hidden.add(x);
@@ -382,6 +386,7 @@ public class GlassView extends View {
     void launch(String pkg) {
         Intent i = launchIntent(getContext().getPackageManager(), pkg);
         if (i != null) { start(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); noteLaunch(pkg); }
+        else flash(pkg.equals("ar.tvplayer.tv") ? "TiviMate isn't installed" : pkg.equals("org.videolan.vlc") ? "VLC isn't installed" : "That app isn't installed");
     }
 
     void start(Intent i) {
@@ -891,7 +896,7 @@ public class GlassView extends View {
 
     List<String> topItems() {
         List<String> t = new ArrayList<String>();
-        t.add("Search"); t.add("Voice");
+        if (!fireTv) { t.add("Search"); t.add("Voice"); } // Fire TV: search and Alexa live on the remote
         if (!inputs.isEmpty()) t.add("Inputs");
         t.add("Net"); t.add("Wi-Fi");
         return t;
@@ -1070,7 +1075,9 @@ public class GlassView extends View {
 
     String setValue(int i) {
         switch (SET_LABELS[i]) {
-            case "Home button": return homeServiceOn() ? "WLH Glass — OK switches to Google TV" : "Google TV — OK, then turn on WLH Glass Home button";
+            case "Home button":
+                if (homeServiceOn()) return "WLH Glass — OK switches to " + homeName();
+                return fireTv ? "Fire TV home — OK to try the switch (newer Fire TVs may block it)" : "Google TV — OK, then turn on WLH Glass Home button";
             case "Favorites": return (favCustom ? favPkgs.size() + " picked" : "Default") + " — OK to pick";
             case "Hide apps": return (hidden.isEmpty() ? "None hidden" : hidden.size() + " hidden") + " — OK to choose";
             case "Background": return bgMode != ROTATE ? bgName(bgMode) : "Rotate every 15 min (now " + bgName(bgIdx) + ")";
