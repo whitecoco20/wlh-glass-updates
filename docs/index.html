@@ -1,0 +1,1127 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0d1a">
+<title>WLH Glass Web</title>
+<meta name="description" content="WLH Glass for any TV or computer browser: clock, weather anywhere, world clocks, your favorite sites, sports scores, profiles and a photo screensaver in 13 languages. Free, no account.">
+<style>
+:root {
+  --accent: #9fd6ff;
+  --glass: rgba(255,255,255,.10);
+  --glass-dark: rgba(10,12,28,.38);
+  --line: rgba(255,255,255,.22);
+  --text: #ffffff;
+  --dim: rgba(255,255,255,.78);
+  --faint: rgba(255,255,255,.58);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; height: 100%; overflow: hidden; background: #0b0d1a; color: var(--text);
+  font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+#bg, #bgPhoto { position: fixed; inset: 0; width: 100%; height: 100%; }
+#bgPhoto { background-size: cover; background-position: center; opacity: 0; transition: opacity 1.2s; }
+#bgPhoto.on { opacity: 1; }
+#shade { position: fixed; inset: 0; background: rgba(0,0,0,.18); }
+/* Everything is laid out on a 1920x1080 stage and scaled to fit the screen. */
+#stage { position: absolute; left: 50%; top: 50%; width: 1920px; height: 1080px; transform-origin: 0 0; }
+.glass { background: var(--glass); border: 1.5px solid var(--line); border-radius: 40px;
+  -webkit-backdrop-filter: blur(26px) saturate(1.3); backdrop-filter: blur(26px) saturate(1.3); box-shadow: 0 24px 60px rgba(0,0,0,.25); }
+.glass.dark { background: var(--glass-dark); }
+.focusable { outline: none; transition: transform .15s, box-shadow .15s; cursor: pointer; }
+.focusable:focus, .focusable.kfocus { box-shadow: 0 0 0 4px var(--accent), 0 0 34px color-mix(in srgb, var(--accent) 55%, transparent); transform: scale(1.04); }
+@supports not (color: color-mix(in srgb, red 50%, blue)) { .focusable:focus { box-shadow: 0 0 0 4px var(--accent), 0 0 30px rgba(159,214,255,.5); } }
+button { font: inherit; color: inherit; background: none; border: 0; }
+
+#clock { position: absolute; left: 72px; top: 52px; }
+#clock, #worlds, #linksTitle, .tile .lab { text-shadow: 0 2px 14px rgba(0,0,0,.45); }
+#time { font-size: 120px; font-weight: 300; letter-spacing: -2px; line-height: 1; }
+#date { font-size: 30px; color: var(--dim); margin-top: 12px; }
+#worlds { position: absolute; left: 520px; top: 66px; display: flex; gap: 48px; }
+.wc .n { font-size: 20px; color: var(--dim); font-weight: 600; }
+.wc .t { font-size: 44px; font-weight: 300; margin-top: 4px; }
+
+#top { position: absolute; right: 72px; top: 64px; display: flex; gap: 20px; }
+.pill { height: 70px; padding: 0 28px; border-radius: 35px; display: flex; align-items: center; gap: 14px; font-size: 23px; font-weight: 600; white-space: nowrap; }
+.pill .dot { width: 14px; height: 14px; border-radius: 50%; background: #8cf0b4; box-shadow: 0 0 12px #8cf0b4; }
+.pill svg { width: 26px; height: 26px; }
+
+#hero { position: absolute; left: 72px; top: 260px; width: 1300px; height: 420px; padding: 56px 64px; display: flex; flex-direction: column; justify-content: flex-end; }
+#hero .k { font-size: 21px; letter-spacing: 3px; font-weight: 700; color: var(--dim); }
+#hero .big { font-size: 84px; font-weight: 700; margin-top: 12px; line-height: 1.05; }
+#hero .sub { font-size: 30px; color: var(--dim); margin-top: 14px; max-width: 980px; }
+#wx { position: absolute; left: 1412px; top: 260px; width: 436px; height: 420px; padding: 36px 40px; }
+#wxCity { font-size: 24px; font-weight: 600; color: var(--dim); display: flex; justify-content: space-between; }
+#wxCity small { font-size: 17px; font-weight: 500; color: var(--faint); }
+#wxNow { display: flex; align-items: center; gap: 20px; margin-top: 18px; }
+#wxIcon { width: 74px; height: 74px; }
+#wxTemp { font-size: 92px; font-weight: 300; line-height: 1; }
+#wxCond { font-size: 25px; margin-top: 10px; }
+#wxAlert { display: none; margin-top: 10px; font-size: 20px; color: #ffc27a; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#wxAlert b { background: #ff8a3d; color: #1a1020; padding: 2px 9px; border-radius: 7px; margin-right: 10px; font-size: 16px; }
+#wxDays { border-top: 1.5px solid rgba(255,255,255,.2); margin-top: 22px; padding-top: 14px; }
+.day { display: flex; justify-content: space-between; font-size: 23px; padding: 9px 0; }
+.day span:nth-child(2) { color: var(--faint); flex: 1; padding-left: 24px; }
+
+#linksTitle { position: absolute; left: 72px; top: 726px; font-size: 32px; font-weight: 600; }
+#links { position: absolute; left: 72px; top: 776px; display: flex; gap: 30px; }
+.tile { width: 178px; display: flex; flex-direction: column; align-items: center; gap: 14px; text-decoration: none; color: #fff; }
+.tile .box { width: 160px; height: 160px; border-radius: 40px; display: flex; align-items: center; justify-content: center; }
+.tile img { width: 84px; height: 84px; border-radius: 18px; }
+.tile .letter { width: 84px; height: 84px; border-radius: 22px; display: flex; align-items: center; justify-content: center; font-size: 44px; font-weight: 800; color: #0b0d1a; background: var(--accent); }
+.tile .lab { font-size: 22px; font-weight: 600; max-width: 178px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tile:focus { box-shadow: none; transform: none; }
+.tile:focus .box { box-shadow: 0 0 0 4px var(--accent), 0 0 34px rgba(159,214,255,.45); transform: scale(1.06); }
+
+#msg { position: absolute; left: 50%; top: 990px; transform: translateX(-50%); padding: 18px 36px; border-radius: 32px; font-size: 24px; font-weight: 600; display: none; z-index: 30; }
+
+/* overlays */
+.overlay { position: absolute; inset: 0; background: rgba(6,8,22,.55); display: none; z-index: 20; }
+.panel { position: absolute; left: 400px; top: 90px; width: 1120px; height: 900px; padding: 50px 60px; display: flex; flex-direction: column; }
+.panel h2 { font-size: 42px; font-weight: 700; }
+.panel .hint { font-size: 20px; color: var(--faint); margin-top: 8px; }
+.rows { margin-top: 26px; overflow-y: auto; flex: 1; scrollbar-width: none; display: flex; flex-direction: column; gap: 10px; }
+.row { display: flex; justify-content: space-between; align-items: center; min-height: 62px; padding: 0 28px; border-radius: 20px; font-size: 25px; background: rgba(255,255,255,.06); text-align: left; width: 100%; }
+.row span:last-child { color: var(--dim); font-size: 22px; max-width: 560px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row:focus { transform: none; }
+input[type=text], input[type=url] { width: 100%; height: 72px; border-radius: 22px; border: 1.5px solid var(--line); background: rgba(255,255,255,.1); color: #fff;
+  font-size: 28px; padding: 0 26px; outline: none; font-family: inherit; }
+input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent); }
+.res { margin-top: 18px; display: flex; flex-direction: column; gap: 10px; }
+.btnrow { display: flex; gap: 16px; margin-top: 18px; }
+.btn { height: 64px; padding: 0 30px; border-radius: 32px; font-size: 24px; font-weight: 700; background: rgba(255,255,255,.12); }
+.btn.primary { background: #fff; color: #12142a; }
+
+/* screensaver */
+#saver { position: absolute; inset: 0; display: none; z-index: 40; background: rgba(0,0,0,.12); }
+#saverBox { position: absolute; padding: 40px 54px; transition: left 2s, top 2s; }
+#saverTime { font-size: 170px; font-weight: 300; line-height: 1; letter-spacing: -3px; }
+#saverLine { font-size: 32px; color: var(--dim); margin-top: 18px; }
+#hide { display: none; }
+/* TV home screen layout: same 1920x1080 positions as the WLH Glass TV app */
+#time { font-size: 88px; font-weight: 300; letter-spacing: 0; }
+#clock { left: 72px; top: 62px; }
+#date { font-size: 26px; margin-top: 8px; }
+#sub2 { font-size: 18px; color: var(--faint); margin-top: 14px; }
+#worlds { left: 440px; top: 70px; gap: 0; }
+.wc { width: 190px; } .wc .n { font-size: 18px; } .wc .t { font-size: 36px; }
+#top { top: 64px; right: 72px; }
+.pill { height: 68px; border-radius: 34px; font-size: 22px; padding: 0 26px; }
+.pill.icon { width: 68px; padding: 0; justify-content: center; }
+#side { position: absolute; left: 64px; top: 250px; width: 320px; padding: 18px; display: flex; flex-direction: column; gap: 8px; border-radius: 36px; }
+.nav { height: 72px; border-radius: 22px; display: flex; align-items: center; gap: 22px; padding-left: 28px; font-size: 26px; font-weight: 500; color: rgba(255,255,255,.86); text-align: left; width: 100%; }
+.nav svg { width: 30px; height: 30px; flex: none; }
+.nav.cur { background: rgba(255,255,255,.12); color: #fff; }
+.nav:focus { transform: none; background: rgba(255,255,255,.22); }
+#hero { left: 440px; top: 190px; width: 1000px; height: 400px; padding: 0; display: block; border-radius: 44px; }
+#recentT { position: absolute; left: 56px; top: 30px; font-size: 18px; font-weight: 500; color: rgba(255,255,255,.8); }
+#recent { position: absolute; left: 56px; top: 60px; display: flex; gap: 20px; }
+.rt { width: 76px; height: 76px; border-radius: 22px; display: flex; align-items: center; justify-content: center; }
+.rt img, .rt .letter { width: 52px; height: 52px; border-radius: 12px; font-size: 28px; }
+#selK { position: absolute; left: 56px; top: 192px; font-size: 20px; font-weight: 500; color: rgba(255,255,255,.8); letter-spacing: 0; }
+#selName { position: absolute; left: 54px; top: 214px; font-size: 72px; font-weight: 700; white-space: nowrap; max-width: 700px; overflow: hidden; text-overflow: ellipsis; }
+#selSub { position: absolute; left: 56px; top: 300px; font-size: 28px; color: rgba(255,255,255,.86); }
+#selIcon { position: absolute; left: 776px; top: 56px; width: 168px; height: 168px; border-radius: 42px; display: flex; align-items: center; justify-content: center; }
+#selIcon img, #selIcon .letter { width: 120px; height: 120px; border-radius: 26px; font-size: 64px; }
+#hb { position: absolute; left: 56px; top: 348px; display: flex; gap: 18px; }
+.hbtn { height: 68px; border-radius: 34px; padding: 0 34px; font-size: 24px; font-weight: 700; display: flex; align-items: center; gap: 14px; }
+.hbtn.white { background: #fff; color: #12142a; }
+#wx { left: 1480px; top: 190px; width: 368px; height: 400px; padding: 30px 34px; }
+#wxCity { font-size: 22px; } #wxTemp { font-size: 76px; } #wxIcon { width: 60px; height: 60px; } #wxCond { font-size: 22px; }
+.day { font-size: 21px; padding: 7px 0; }
+#linksTitle { left: 440px; top: 640px; font-size: 30px; font-weight: 500; }
+#links { left: 440px; top: 700px; gap: 30px; }
+.tile { width: 148px; gap: 0; }
+.tile .box { width: 148px; height: 148px; border-radius: 38px; }
+.tile img, .tile .letter { width: 98px; height: 98px; border-radius: 22px; }
+.tile .lab { font-size: 21px; font-weight: 500; margin-top: 22px; max-width: 176px; }
+#quick { position: absolute; left: 440px; top: 914px; display: flex; gap: 20px; }
+.qb { height: 84px; border-radius: 24px; padding: 0 26px; display: flex; align-items: center; gap: 14px; font-size: 22px; font-weight: 500; }
+.qb svg { width: 28px; height: 28px; }
+.letter { display: flex; align-items: center; justify-content: center; font-weight: 800; color: #0b0d1a; background: var(--accent); }
+
+#games { position: absolute; left: 64px; top: 702px; width: 320px; height: 296px; padding: 22px 26px; border-radius: 32px; display: none; overflow: hidden; }
+#games:focus { transform: none; }
+#games .gh { display: flex; justify-content: space-between; align-items: baseline; font-size: 20px; font-weight: 500; color: rgba(255,255,255,.8); margin-bottom: 6px; }
+#games .gh small { font-size: 16px; color: var(--accent); visibility: hidden; }
+#games:focus .gh small, #games:hover .gh small { visibility: visible; }
+.gr { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 19px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,.1); }
+.gr:last-child { border-bottom: 0; }
+.gr b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.gr span { color: rgba(255,255,255,.78); font-size: 16px; white-space: nowrap; flex: none; }
+.gr.live span { color: #ffb3b3; } .gr.live span:before { content: "\25CF  "; color: #ff5a5a; }
+.gr.big { flex-direction: column; gap: 4px; padding: 12px 0; } .gr.big b { font-size: 24px; } .gr.big span { font-size: 19px; }
+.panel.wide { left: 120px; width: 1680px; }
+.phead { display: flex; justify-content: space-between; align-items: center; }
+#boardGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 30px; margin-top: 28px; overflow-y: auto; flex: 1; scrollbar-width: none; align-content: start; }
+.bc { padding: 24px 28px; border-radius: 30px; background: rgba(255,255,255,.07); border: 1.5px solid rgba(255,255,255,.14); min-height: 330px; }
+.bc h3 { font-size: 28px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bc .s { font-size: 19px; color: var(--dim); margin-top: 6px; min-height: 24px; }
+.bc .l { display: flex; gap: 16px; font-size: 22px; margin-top: 16px; } .bc .l i { font-style: normal; font-size: 18px; color: var(--faint); width: 70px; flex: none; padding-top: 3px; }
+.bc .l div div { margin-bottom: 6px; }
+.bc .live { color: #ffb3b3; font-weight: 600; } .bc .live:before { content: "\25CF  "; color: #ff5a5a; }
+#langGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 30px; }
+#langGrid .row { justify-content: center; font-size: 27px; }
+#langGrid .row.cur { background: rgba(255,255,255,.22); }
+#news { position: absolute; left: 470px; top: 340px; width: 490px; height: 80px; display: none; }
+#newsK { font-size: 15px; font-weight: 700; color: var(--accent); letter-spacing: .04em; text-transform: uppercase; }
+#newsBox { position: absolute; top: 26px; left: 0; right: 0; height: 40px; overflow: hidden; }
+#newsTx { position: absolute; left: 0; top: 6px; white-space: nowrap; font-size: 22px; font-weight: 500; color: rgba(255,255,255,.95); text-shadow: 0 2px 6px rgba(0,0,0,.35); }
+#pw{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:#0b0d1a;color:#fff;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:16px;overflow:auto}
+#pw.off{display:none}#pw .pc{max-width:860px;width:100%;display:flex;gap:28px;align-items:center;flex-wrap:wrap;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.18);border-radius:28px;padding:28px}
+#pw .pt{flex:1 1 300px}#pw h1{margin:0 0 6px;font-size:32px}#pw .ps{color:#9fd6ff;margin:0 0 16px}#pw ol{padding-left:20px;color:#dfe6f3;margin:0 0 14px}#pw li{margin:5px 0}
+#pw .pp{font-size:52px;font-weight:800;margin:6px 0 14px}#pw a.pb{display:inline-block;background:#9fd6ff;color:#0b0d1a;font-weight:700;text-decoration:none;padding:12px 22px;border-radius:14px}
+#pw small{display:block;color:#b9c3d6;margin-top:14px}#pw canvas{background:#fff;border-radius:22px;width:260px;height:260px;flex:none}
+</style>
+</head>
+<body>
+<div id="pw" role="dialog" aria-modal="true" aria-labelledby="pwT"><div class="pc"><div class="pt">
+<h1 id="pwT">Unlock WLH Glass Web</h1><p class="ps">One-time purchase for this browser. No ads, no account.</p>
+<ol><li>Scan the code with your phone, or click Buy now.</li><li>Pay once with card, Apple Pay or Google Pay.</li><li>This page unlocks by itself in a few seconds.</li></ol>
+<div class="pp" id="pwPrice">$100</div><a class="pb" id="pwBuy" target="_blank" rel="noopener">Buy now</a>
+<small id="pwWait">Waiting for payment…</small></div><canvas id="pwQr" width="460" height="460" aria-label="QR code to buy WLH Glass Web"></canvas></div></div>
+<canvas id="bg"></canvas>
+<div id="bgPhoto"></div>
+<div id="shade"></div>
+
+<div id="stage">
+  <div id="clock"><div id="time">--:--</div><div id="date"></div><div id="sub2">WLH Glass Web</div></div>
+  <div id="worlds"></div>
+
+  <div id="top">
+    <button class="glass pill focusable" id="profPill"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg><span id="profName">Me</span></button>
+    <button class="glass pill focusable" id="netPill" title="Where your connection comes from"><span class="dot" id="netDot"></span><span id="netText">Checking…</span></button>
+    <button class="glass pill focusable" id="fsBtn" title="Full screen"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg><span data-t="Full screen">Full screen</span></button>
+  </div>
+
+  <div id="side" class="glass dark">
+    <button class="nav cur focusable" id="navHome"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7M5 10v10h14V10"/></svg><span data-t="Home">Home</span></button>
+    <button class="nav focusable" id="navSites"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="6" height="6" rx="1.5"/><rect x="14" y="4" width="6" height="6" rx="1.5"/><rect x="4" y="14" width="6" height="6" rx="1.5"/><rect x="14" y="14" width="6" height="6" rx="1.5"/></svg><span data-t="Sites">Sites</span></button>
+    <button class="nav focusable" id="navWx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="9" r="3.5"/><path d="M7 18h10a4 4 0 0 0 0-8 5 5 0 0 0-9.6 1.5A3.3 3.3 0 0 0 7 18z"/></svg><span data-t="Weather">Weather</span></button>
+    <button class="nav focusable" id="navPhotos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-8 8"/></svg><span data-t="Photos">Photos</span></button>
+    <button class="nav focusable" id="setBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8"/></svg><span data-t="Settings">Settings</span></button>
+  </div>
+
+  <div id="games" class="glass dark focusable" tabindex="0"><div class="gh"><span data-t="Scores">Scores</span><small data-t="OK: scoreboard">OK: scoreboard</small></div><div id="gRows"></div></div>
+
+  <div id="hero" class="glass">
+    <div id="recentT" data-t="Recently opened">Recently opened</div><div id="recent"></div>
+    <div id="selIcon" class="glass dark"></div>
+    <div id="selK" data-t="Selected">Selected</div><div id="selName">YouTube</div><div id="selSub">youtube.com</div>
+    <div id="news"><div id="newsK" data-t="Top stories">Top stories</div><div id="newsBox"><div id="newsTx"></div></div></div>
+    <div id="hb"><button class="hbtn white focusable" id="openBtn"><svg viewBox="0 0 24 24" width="22" height="22"><path d="M7 4l13 8-13 8z" fill="#12142a"/></svg><span data-t="Open">Open</span></button><button class="hbtn glass focusable" id="allBtn" data-t="Edit sites">Edit sites</button></div>
+  </div>
+
+  <div id="wx" class="glass focusable" tabindex="0" >
+    <div id="wxCity"><span id="wxName">Houston</span><small id="wxUpd"></small></div>
+    <div id="wxNow"><svg id="wxIcon" viewBox="0 0 24 24"></svg><div id="wxTemp">--°</div></div>
+    <div id="wxCond">Loading weather…</div>
+    <div id="wxAlert"></div>
+    <div id="wxDays"></div>
+  </div>
+
+  <div id="linksTitle" data-t="Your sites">Your sites</div>
+  <div id="links"></div>
+
+  <div id="quick">
+    <button class="glass qb focusable" id="qBg"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-8 8"/></svg><span data-t="Background">Background</span></button>
+    <button class="glass qb focusable" id="qSaver"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg><span data-t="Screensaver">Screensaver</span></button>
+    <button class="glass qb focusable" id="qClock"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3 2"/></svg><span id="qClockT">24-hour</span></button>
+    <button class="glass qb focusable" id="qAccent"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7" fill="var(--accent)"/></svg><span data-t="Accent color">Accent color</span></button>
+    <button class="glass qb focusable" id="qApp"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M8 21h8"/></svg><span data-t="Get the TV app">Get the TV app</span></button>
+  </div>
+
+  <div id="msg" class="glass dark"></div>
+
+  <div class="overlay" id="settings"><div class="panel glass dark">
+    <h2 data-t="Settings">Settings</h2><div class="hint" data-t="OK to change · Back or Esc to close">OK to change · Back or Esc to close</div>
+    <div class="rows" id="setRows"></div>
+  </div></div>
+
+  <div class="overlay" id="search"><div class="panel glass dark">
+    <h2 id="searchTitle">Weather location</h2><div class="hint" data-t="Type a city or a country, e.g. Paris or Japan. Add a comma to narrow it down: Paris, Texas">Type a city or a country, e.g. Paris or Japan. Add a comma to narrow it down: Paris, Texas</div>
+    <div style="margin-top:26px"><input type="text" id="q" placeholder="City or country" data-tp="City or country" autocomplete="off"></div>
+    <div class="btnrow"><button class="btn primary focusable" id="qGo" data-t="Search">Search</button><button class="btn focusable" id="qCancel" data-t="Cancel">Cancel</button></div>
+    <div class="res" id="qRes"></div>
+  </div></div>
+
+  <div class="overlay" id="linkEd"><div class="panel glass dark">
+    <h2 data-t="Your sites">Your sites</h2><div class="hint" data-t="Up to 8 sites. OK on one to remove it.">Up to 8 sites. OK on one to remove it.</div>
+    <div class="res" id="linkList" style="margin-top:22px"></div>
+    <div style="margin-top:26px;display:flex;gap:16px"><input type="text" id="lName" placeholder="Name (YouTube)" data-tp="Name (YouTube)" style="width:34%"><input type="url" id="lUrl" placeholder="Address (youtube.com)" data-tp="Address (youtube.com)"></div>
+    <div class="btnrow"><button class="btn primary focusable" id="lAdd" data-t="Add site">Add site</button><button class="btn focusable" id="lDone" data-t="Done">Done</button></div>
+  </div></div>
+
+  <div class="overlay" id="share"><div class="panel glass dark">
+    <h2 data-t="Send to another device">Send to another device</h2><div class="hint" data-t="Scan with a phone, or copy the link and open it on your work computer. It carries your sites, weather, clocks, colors and teams.">Scan with a phone, or copy the link and open it on your work computer. It carries your sites, weather, clocks, colors and teams.</div>
+    <div style="display:flex;gap:40px;margin-top:30px;align-items:flex-start">
+      <canvas id="shareQr" width="460" height="460" style="background:#fff;border-radius:24px;flex:none"></canvas>
+      <div style="flex:1;min-width:0"><div id="shareLink" style="font-size:20px;color:var(--dim);word-break:break-all;line-height:1.4;max-height:300px;overflow:hidden"></div>
+        <div class="btnrow" style="flex-wrap:wrap"><button class="btn primary focusable" id="shCopy" data-t="Copy link">Copy link</button><button class="btn focusable" id="shShare" data-t="Share…">Share…</button><button class="btn focusable" id="shDone" data-t="Done">Done</button></div></div>
+    </div>
+  </div></div>
+
+  <div class="overlay" id="pick"><div class="panel glass dark">
+    <h2 id="pickTitle"></h2><div class="hint" id="pickHint"></div>
+    <div class="rows" id="pickRows"></div>
+  </div></div>
+
+  <div class="overlay" id="ask"><div class="panel glass dark" style="height:auto">
+    <h2 id="askTitle"></h2>
+    <div style="margin-top:30px"><input type="text" id="askIn" maxlength="20" autocomplete="off"></div>
+    <div class="btnrow"><button class="btn primary focusable" id="askOk" data-t="Save">Save</button><button class="btn focusable" id="askNo" data-t="Cancel">Cancel</button></div>
+  </div></div>
+
+  <div class="overlay" id="board"><div class="panel wide glass dark">
+    <div class="phead"><h2 data-t="Scoreboard">Scoreboard</h2><button class="btn focusable" id="boardClose" data-t="Close">Close</button></div>
+    <div id="boardGrid"></div>
+  </div></div>
+
+  <div class="overlay" id="langO"><div class="panel glass dark">
+    <h2>Choose your language</h2><div class="hint">Elige tu idioma · Escolha seu idioma · Choisissez votre langue · Sprache wählen · 选择语言 · 言語を選択</div>
+    <div id="langGrid"></div>
+  </div></div>
+
+  <div id="saver"><div id="saverBox" class="glass dark"><div id="saverTime"></div><div id="saverLine"></div></div></div>
+</div>
+<input type="file" id="hide" accept="image/*" multiple>
+
+<script>
+"use strict";
+// Minimal QR encoder (byte mode, level L, versions 1-10). Same algorithm as the TV app's QR.java.
+var QR = (function () {
+  var ECC = [-1, 7, 10, 15, 20, 26, 18, 20, 24, 30, 18], NB = [-1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 4];
+  function raw(v) { var r = (16 * v + 128) * v + 64; if (v >= 2) { var na = Math.floor(v / 7) + 2; r -= (25 * na - 10) * na - 55; if (v >= 7) r -= 36; } return r; }
+  function dataCw(v) { return Math.floor(raw(v) / 8) - ECC[v] * NB[v]; }
+  function mul(x, y) { var z = 0; for (var i = 7; i >= 0; i--) { z = (z << 1) ^ ((z >>> 7) * 0x11D); z ^= ((y >>> i) & 1) * x; } return z & 255; }
+  function divisor(d) { var r = []; for (var i = 0; i < d; i++) r.push(0); r[d - 1] = 1; var root = 1;
+    for (i = 0; i < d; i++) { for (var j = 0; j < r.length; j++) { r[j] = mul(r[j], root); if (j + 1 < r.length) r[j] ^= r[j + 1]; } root = mul(root, 2); } return r; }
+  function remainder(data, div) { var r = div.map(function () { return 0; });
+    data.forEach(function (b) { var f = b ^ r.shift(); r.push(0); for (var i = 0; i < r.length; i++) r[i] ^= mul(div[i], f); }); return r; }
+  function encode(text) {
+    var data = Array.prototype.slice.call(new TextEncoder().encode(text));
+    for (var v = 1; v <= 10; v++) { var cap = dataCw(v) * 8, cc = v <= 9 ? 8 : 16; if (4 + cc + data.length * 8 <= cap) return build(v, data, cc, cap); }
+    return null;
+  }
+  function build(ver, data, ccBits, capBits) {
+    var size = ver * 4 + 17, mod = [], fn = [], bits = [];
+    for (var y = 0; y < size; y++) { mod.push(new Array(size).fill(false)); fn.push(new Array(size).fill(false)); }
+    function put(val, n) { for (var i = n - 1; i >= 0; i--) bits.push((val >>> i) & 1); }
+    put(4, 4); put(data.length, ccBits); data.forEach(function (b) { put(b, 8); });
+    put(0, Math.min(4, capBits - bits.length)); put(0, (8 - bits.length % 8) % 8);
+    for (var pad = 0xEC; bits.length < capBits; pad ^= 0xEC ^ 0x11) put(pad, 8);
+    var cw = []; for (var i = 0; i < bits.length; i += 8) { var b = 0; for (var k = 0; k < 8; k++) b = (b << 1) | bits[i + k]; cw.push(b); }
+    var nb = NB[ver], ecl = ECC[ver], rw = Math.floor(raw(ver) / 8), nShort = nb - rw % nb, shortLen = Math.floor(rw / nb), div = divisor(ecl), blocks = [], o = 0;
+    for (i = 0; i < nb; i++) { var dl = shortLen - ecl + (i < nShort ? 0 : 1), dat = cw.slice(o, o + dl); o += dl;
+      var ecc = remainder(dat, div), blk = dat.slice(); while (blk.length < shortLen + 1 - ecl) blk.push(0); if (i < nShort) blk = dat.concat([0]); blocks.push(blk.slice(0, shortLen + 1 - ecl).concat(ecc)); }
+    var all = []; for (i = 0; i < blocks[0].length; i++) for (var j = 0; j < nb; j++) if (i !== shortLen - ecl || j >= nShort) all.push(blocks[j][i]);
+    function set(x, y, d) { mod[y][x] = d; fn[y][x] = true; }
+    function finder(cx, cy) { for (var dy = -4; dy <= 4; dy++) for (var dx = -4; dx <= 4; dx++) { var d = Math.max(Math.abs(dx), Math.abs(dy)), x = cx + dx, y = cy + dy; if (x >= 0 && x < size && y >= 0 && y < size) set(x, y, d !== 2 && d !== 4); } }
+    function format(mask) { var d = 1 << 3 | mask, rem = d; for (var i = 0; i < 10; i++) rem = (rem << 1) ^ ((rem >>> 9) * 0x537);
+      var bt = (d << 10 | rem) ^ 0x5412, B = function (i) { return ((bt >>> i) & 1) !== 0; };
+      for (i = 0; i <= 5; i++) set(8, i, B(i)); set(8, 7, B(6)); set(8, 8, B(7)); set(7, 8, B(8)); for (i = 9; i < 15; i++) set(14 - i, 8, B(i));
+      for (i = 0; i < 8; i++) set(size - 1 - i, 8, B(i)); for (i = 8; i < 15; i++) set(8, size - 15 + i, B(i)); set(8, size - 8, true); }
+    for (i = 0; i < size; i++) { set(6, i, i % 2 === 0); set(i, 6, i % 2 === 0); }
+    finder(3, 3); finder(size - 4, 3); finder(3, size - 4);
+    if (ver > 1) { var n = Math.floor(ver / 7) + 2, step = Math.floor((ver * 8 + n * 3 + 5) / (n * 4 - 4)) * 2, al = [6];
+      for (var q = n - 1, pos = size - 7; q >= 1; q--, pos -= step) al[q] = pos;
+      for (i = 0; i < n; i++) for (j = 0; j < n; j++) { if ((i === 0 && j === 0) || (i === 0 && j === n - 1) || (i === n - 1 && j === 0)) continue;
+        for (var dy = -2; dy <= 2; dy++) for (var dx = -2; dx <= 2; dx++) set(al[i] + dx, al[j] + dy, Math.max(Math.abs(dx), Math.abs(dy)) !== 1); } }
+    format(0);
+    if (ver >= 7) { var rem = ver; for (i = 0; i < 12; i++) rem = (rem << 1) ^ ((rem >>> 11) * 0x1F25); var vb = ver << 12 | rem;
+      for (i = 0; i < 18; i++) { var bb = ((vb >>> i) & 1) !== 0, a = size - 11 + i % 3, c = Math.floor(i / 3); set(a, c, bb); set(c, a, bb); } }
+    var bi = 0;
+    for (var right = size - 1; right >= 1; right -= 2) { if (right === 6) right = 5;
+      for (var vert = 0; vert < size; vert++) for (j = 0; j < 2; j++) { var x = right - j, up = ((right + 1) & 2) === 0, yy = up ? size - 1 - vert : vert;
+        if (!fn[yy][x] && bi < all.length * 8) { mod[yy][x] = ((all[bi >>> 3] >>> (7 - (bi & 7))) & 1) !== 0; bi++; } } }
+    function mask(m) { for (var y = 0; y < size; y++) for (var x = 0; x < size; x++) { var inv;
+      switch (m) { case 0: inv = (x + y) % 2 === 0; break; case 1: inv = y % 2 === 0; break; case 2: inv = x % 3 === 0; break; case 3: inv = (x + y) % 3 === 0; break;
+        case 4: inv = (Math.floor(x / 3) + Math.floor(y / 2)) % 2 === 0; break; case 5: inv = x * y % 2 + x * y % 3 === 0; break;
+        case 6: inv = (x * y % 2 + x * y % 3) % 2 === 0; break; default: inv = ((x + y) % 2 + x * y % 3) % 2 === 0; }
+      if (!fn[y][x] && inv) mod[y][x] = !mod[y][x]; } }
+    function penalty() { var p = 0, dark = 0;
+      for (var y = 0; y < size; y++) { var run = 1, runC = 1; for (var x = 0; x < size; x++) { if (mod[y][x]) dark++;
+        if (x > 0) { if (mod[y][x] === mod[y][x - 1]) { run++; if (run === 5) p += 3; else if (run > 5) p++; } else run = 1;
+          if (mod[x][y] === mod[x - 1][y]) { runC++; if (runC === 5) p += 3; else if (runC > 5) p++; } else runC = 1; }
+        if (x > 0 && y > 0 && mod[y][x] === mod[y][x - 1] && mod[y][x] === mod[y - 1][x] && mod[y][x] === mod[y - 1][x - 1]) p += 3; } }
+      var t = size * size, k = Math.ceil(Math.abs(dark * 20 - t * 10) / t) - 1; return p + Math.max(0, k) * 10; }
+    var best = 0, bp = 1e9; for (var m = 0; m < 8; m++) { mask(m); format(m); var pn = penalty(); if (pn < bp) { bp = pn; best = m; } mask(m); }
+    mask(best); format(best);
+    return { size: size, mod: mod };
+  }
+  return { encode: encode };
+})();
+
+var WEB_SITES = {yt: { n: "YouTube", u: "https://www.youtube.com" }, nf: { n: "Netflix", u: "https://www.netflix.com" }, pv: { n: "Prime Video", u: "https://www.primevideo.com" }, dp: { n: "Disney+", u: "https://www.disneyplus.com" }, hu: { n: "Hulu", u: "https://www.hulu.com" }, mx: { n: "Max", u: "https://play.max.com" }, pk: { n: "Peacock", u: "https://www.peacocktv.com" }, pp: { n: "Paramount+", u: "https://www.paramountplus.com" }, ap: { n: "Apple TV+", u: "https://tv.apple.com" }, sp: { n: "Spotify", u: "https://open.spotify.com" }, pl: { n: "Pluto TV", u: "https://pluto.tv" }, tb: { n: "Tubi", u: "https://tubitv.com" }, tw: { n: "Twitch", u: "https://www.twitch.tv" }, px: { n: "Plex", u: "https://app.plex.tv" }, cr: { n: "Crunchyroll", u: "https://www.crunchyroll.com" }, yv: { n: "YouTube TV", u: "https://tv.youtube.com" }, sl: { n: "Sling", u: "https://watch.sling.com" }, pd: { n: "Pandora", u: "https://www.pandora.com" }, es: { n: "ESPN", u: "https://www.espn.com/watch" }, fb: { n: "Fubo", u: "https://www.fubo.tv" }, ph: { n: "Philo", u: "https://www.philo.com" }, ym: { n: "YouTube Music", u: "https://music.youtube.com" }, am: { n: "Amazon Music", u: "https://music.amazon.com" }, st: { n: "Starz", u: "https://www.starz.com" }};
+var WEB_URL = "https://raw.githack.com/whitecoco20/wlh-glass-updates/main/docs/index.html";
+function keyForUrl(u) { var h = host(u); for (var k in WEB_SITES) if (host(WEB_SITES[k].u) === h) return k; return null; }
+// ---------- storage (never required) ----------
+var store = {
+  get: function (k, d) { try { var v = localStorage.getItem("wlhg." + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set: function (k, v) { try { localStorage.setItem("wlhg." + k, JSON.stringify(v)); } catch (e) {} }
+};
+// ---------- language (same 13 as the TV app) ----------
+var LANGS = ["en", "es", "pt", "fr", "de", "it", "nl", "pl", "tr", "ru", "zh", "ja", "hi"];
+var LANG_NAMES = ["English", "Español", "Português", "Français", "Deutsch", "Italiano", "Nederlands", "Polski", "Türkçe", "Русский", "中文（简体）", "日本語", "हिन्दी"];
+var LOCALES = ["en", "es", "pt-BR", "fr", "de", "it", "nl", "pl", "tr", "ru", "zh-CN", "ja", "hi"];
+var I18N = {"(+{0} more)":["(+{0} más)","(+{0} mais)","(+{0} autres)","(+{0} weitere)","(+{0} altri)","(+{0} meer)","(+{0} więcej)","(+{0} tane daha)","(+{0} ещё)","（另有 {0} 条）","（他 {0} 件）","(+{0} और)"],"(capital)":["(capital)","(capital)","(capitale)","(Hauptstadt)","(capitale)","(hoofdstad)","(stolica)","(başkent)","(столица)","（首都）","（首都）","(राजधानी)"],"(center)":["(centro)","(centro)","(centre)","(Mitte)","(centro)","(midden)","(środek)","(merkez)","(центр)","（中心）","（中心）","(केंद्र)"],"1 photo added":["1 foto añadida","1 foto adicionada","1 photo ajoutée","1 Foto hinzugefügt","1 foto aggiunta","1 foto toegevoegd","Dodano 1 zdjęcie","1 fotoğraf eklendi","Добавлено 1 фото","已添加 1 张照片","写真を1枚追加しました","1 फ़ोटो जोड़ी गई"],"12-hour":["12 horas","12 horas","12 heures","12 Stunden","12 ore","12-uurs","12-godzinny","12 saat","12 часов","12 小时制","12時間","12-घंटे"],"24-hour":["24 horas","24 horas","24 heures","24 Stunden","24 ore","24-uurs","24-godzinny","24 saat","24 часа","24 小时制","24時間","24-घंटे"],"ALERT":["ALERTA","ALERTA","ALERTE","WARNUNG","ALLERTA","WAARSCHUWING","ALERT","UYARI","ТРЕВОГА","预警","警報","चेतावनी"],"Accent color":["Color de acento","Cor de destaque","Couleur d'accent","Akzentfarbe","Colore di accento","Accentkleur","Kolor akcentu","Vurgu rengi","Цвет акцента","强调色","アクセントカラー","एक्सेंट रंग"],"Accent: {0}":["Color: {0}","Cor: {0}","Couleur : {0}","Akzent: {0}","Colore: {0}","Accent: {0}","Akcent: {0}","Vurgu: {0}","Акцент: {0}","强调色：{0}","アクセント：{0}","रंग: {0}"],"Add a profile":["Añadir un perfil","Adicionar perfil","Ajouter un profil","Profil hinzufügen","Aggiungi un profilo","Profiel toevoegen","Dodaj profil","Profil ekle","Добавить профиль","添加个人资料","プロフィールを追加","प्रोफ़ाइल जोड़ें"],"Add a team":["Añadir un equipo","Adicionar time","Ajouter une équipe","Team hinzufügen","Aggiungi una squadra","Team toevoegen","Dodaj drużynę","Takım ekle","Добавить команду","添加球队","チームを追加","टीम जोड़ें"],"Add a world clock":["Agregar un reloj mundial","Adicionar um relógio mundial","Ajouter une horloge","Weltuhr hinzufügen","Aggiungi un orologio","Wereldklok toevoegen","Dodaj zegar światowy","Dünya saati ekle","Добавить мировое время","添加世界时钟","世界時計を追加","विश्व घड़ी जोड़ें"],"Add site":["Añadir sitio","Adicionar site","Ajouter le site","Seite hinzufügen","Aggiungi sito","Site toevoegen","Dodaj stronę","Site ekle","Добавить сайт","添加网站","サイトを追加","साइट जोड़ें"],"Add teams in Settings › Sports teams":["Añade equipos en Ajustes › Equipos","Adicione times em Configurações › Times","Ajoutez des équipes dans Réglages › Équipes","Teams unter Einstellungen › Sportteams hinzufügen","Aggiungi squadre in Impostazioni › Squadre","Voeg teams toe via Instellingen › Sportteams","Dodaj drużyny w Ustawienia › Drużyny","Takımları Ayarlar › Spor takımları bölümünden ekleyin","Добавьте команды в Настройки › Команды","在 设置 › 运动球队 中添加球队","設定 › スポーツチーム でチームを追加","सेटिंग्स › खेल टीमें में टीमें जोड़ें"],"Add your photos":["Añadir tus fotos","Adicionar suas fotos","Ajouter vos photos","Eigene Fotos hinzufügen","Aggiungi le tue foto","Je foto's toevoegen","Dodaj swoje zdjęcia","Fotoğraflarını ekle","Добавить свои фото","添加你的照片","写真を追加","अपनी फ़ोटो जोड़ें"],"Add your sites":["Añade tus sitios","Adicione seus sites","Ajoutez vos sites","Eigene Seiten hinzufügen","Aggiungi i tuoi siti","Voeg je sites toe","Dodaj swoje strony","Sitelerini ekle","Добавьте свои сайты","添加你的网站","サイトを追加","अपनी साइटें जोड़ें"],"Added ":["Agregado: ","Adicionado: ","Ajouté : ","Hinzugefügt: ","Aggiunta:","Toegevoegd: ","Dodano: ","Eklendi: ","Добавлено: ","已添加 ","追加: ","जोड़ा गया:"],"Address (youtube.com)":["Dirección (youtube.com)","Endereço (youtube.com)","Adresse (youtube.com)","Adresse (youtube.com)","Indirizzo (youtube.com)","Adres (youtube.com)","Adres (youtube.com)","Adres (youtube.com)","Адрес (youtube.com)","网址 (youtube.com)","アドレス (youtube.com)","पता (youtube.com)"],"Already added":["Ya añadido","Já adicionado","Déjà ajouté","Bereits hinzugefügt","Già aggiunta","Al toegevoegd","Już dodano","Zaten eklendi","Уже добавлено","已添加","追加済み","पहले से जोड़ा गया"],"Aurora":["Aurora","Aurora","Aurore","Polarlicht","Aurora","Noorderlicht","Zorza","Kutup ışığı","Сияние","极光","オーロラ","ध्रुवीय ज्योति"],"Background":["Fondo","Fundo","Fond","Hintergrund","Sfondo","Achtergrond","Tło","Arka plan","Фон","背景","背景","पृष्ठभूमि"],"Blue":["Azul","Azul","Bleu","Blau","Blu","Blauw","Niebieski","Mavi","Синий","蓝色","ブルー","नीला"],"Cancel":["Cancelar","Cancelar","Annuler","Abbrechen","Annulla","Annuleren","Anuluj","İptal","Отмена","取消","キャンセル","रद्द करें"],"Checking…":["Comprobando…","Verificando…","Vérification…","Prüfe…","Verifica…","Controleren…","Sprawdzanie…","Kontrol ediliyor…","Проверка…","正在检查…","確認中…","जाँच रहे हैं…"],"City or country":["Ciudad o país","Cidade ou país","Ville ou pays","Stadt oder Land","Città o paese","Stad of land","Miasto lub kraj","Şehir veya ülke","Город или страна","城市或国家","都市または国","शहर या देश"],"Clear":["Despejado","Céu limpo","Dégagé","Klar","Sereno","Helder","Bezchmurnie","Açık","Ясно","晴","晴れ","साफ़"],"Clock added: {0}":["Reloj añadido: {0}","Relógio adicionado: {0}","Horloge ajoutée : {0}","Uhr hinzugefügt: {0}","Orologio aggiunto: {0}","Klok toegevoegd: {0}","Dodano zegar: {0}","Saat eklendi: {0}","Часы добавлены: {0}","已添加时钟：{0}","時計を追加：{0}","घड़ी जोड़ी गई: {0}"],"Clock format":["Formato de hora","Formato do relógio","Format de l'heure","Uhrzeitformat","Formato ora","Tijdnotatie","Format godziny","Saat biçimi","Формат времени","时间格式","時刻の形式","घड़ी का प्रारूप"],"Clock time zone":["Zona horaria del reloj","Fuso horário do relógio","Fuseau de l'horloge","Zeitzone der Uhr","Fuso orario","Tijdzone van klok","Strefa czasowa zegara","Saat dilimi","Часовой пояс","时钟时区","時計のタイムゾーン","घड़ी का समय क्षेत्र"],"Close":["Cerrar","Fechar","Fermer","Schließen","Chiudi","Sluiten","Zamknij","Kapat","Закрыть","关闭","閉じる","बंद करें"],"Cloudy":["Nublado","Nublado","Nuageux","Bewölkt","Nuvoloso","Bewolkt","Pochmurno","Bulutlu","Облачно","多云","曇り","बादल"],"Copy link":["Copiar enlace","Copiar link","Copier le lien","Link kopieren","Copia link","Link kopiëren","Kopiuj link","Bağlantıyı kopyala","Копировать ссылку","复制链接","リンクをコピー","लिंक कॉपी करें"],"Couldn't find the time zone for {0}":["No se encontró la zona horaria de {0}","Fuso horário de {0} não encontrado","Fuseau horaire introuvable pour {0}","Zeitzone für {0} nicht gefunden","Fuso orario di {0} non trovato","Tijdzone voor {0} niet gevonden","Nie znaleziono strefy czasowej dla {0}","{0} için saat dilimi bulunamadı","Не удалось найти часовой пояс для {0}","找不到 {0} 的时区","{0} のタイムゾーンが見つかりません","{0} का समय क्षेत्र नहीं मिला"],"Couldn't load teams. Try again.":["No se pudieron cargar los equipos. Inténtalo de nuevo.","Não foi possível carregar os times. Tente de novo.","Impossible de charger les équipes. Réessayez.","Teams konnten nicht geladen werden. Erneut versuchen.","Impossibile caricare le squadre. Riprova.","Teams laden mislukt. Probeer opnieuw.","Nie udało się wczytać drużyn. Spróbuj ponownie.","Takımlar yüklenemedi. Tekrar deneyin.","Не удалось загрузить команды. Попробуйте снова.","无法加载球队，请重试。","チームを読み込めませんでした。もう一度お試しください。","टीमें लोड नहीं हुईं। फिर कोशिश करें।"],"Couldn't read one of the photos":["No se pudo leer una de las fotos","Não foi possível ler uma das fotos","Impossible de lire une des photos","Ein Foto konnte nicht gelesen werden","Impossibile leggere una delle foto","Een van de foto's kon niet worden gelezen","Nie udało się odczytać jednego zdjęcia","Fotoğraflardan biri okunamadı","Не удалось прочитать одно из фото","有一张照片无法读取","写真を1枚読み込めませんでした","एक फ़ोटो पढ़ी नहीं जा सकी"],"Current":["Actual","Atual","Actuel","Aktuell","Attuale","Huidig","Bieżący","Geçerli","Текущий","当前","現在","वर्तमान"],"D":["E","E","N","U","P","G","R","B","Н","平","分","ड्रॉ"],"Done":["Listo","Pronto","Terminé","Fertig","Fine","Klaar","Gotowe","Bitti","Готово","完成","完了","हो गया"],"Drizzle":["Llovizna","Garoa","Bruine","Nieselregen","Pioviggine","Motregen","Mżawka","Çisenti","Морось","毛毛雨","霧雨","बूंदाबांदी"],"Each profile keeps its own sites, accent color, background and teams.":["Cada perfil guarda sus propios sitios, color, fondo y equipos.","Cada perfil guarda seus próprios sites, cor, fundo e times.","Chaque profil garde ses propres sites, couleur, fond et équipes.","Jedes Profil hat eigene Seiten, Akzentfarbe, Hintergrund und Teams.","Ogni profilo ha i propri siti, colore, sfondo e squadre.","Elk profiel heeft eigen sites, accentkleur, achtergrond en teams.","Każdy profil ma własne strony, kolor, tło i drużyny.","Her profilin kendi siteleri, rengi, arka planı ve takımları vardır.","У каждого профиля свои сайты, цвет, фон и команды.","每个个人资料都有自己的网站、强调色、背景和球队。","プロフィールごとにサイト、色、背景、チームが別々に保存されます。","हर प्रोफ़ाइल की अपनी साइटें, रंग, बैकग्राउंड और टीमें होती हैं।"],"Edit sites":["Editar sitios","Editar sites","Modifier les sites","Seiten bearbeiten","Modifica siti","Sites bewerken","Edytuj strony","Siteleri düzenle","Изменить сайты","编辑网站","サイトを編集","साइटें संपादित करें"],"Feels {0}":["Sensación {0}","Sensação {0}","Ressenti {0}","Gefühlt {0}","Percepita {0}","Voelt als {0}","Odczuwalna {0}","Hissedilen {0}","Ощущается {0}","体感 {0}","体感 {0}","महसूस {0}"],"Fog":["Niebla","Neblina","Brouillard","Nebel","Nebbia","Mist","Mgła","Sis","Туман","雾","霧","कोहरा"],"Forest":["Bosque","Floresta","Forêt","Wald","Foresta","Bos","Las","Orman","Лес","森林","森","जंगल"],"Full screen":["Pantalla completa","Tela cheia","Plein écran","Vollbild","Schermo intero","Volledig scherm","Pełny ekran","Tam ekran","Во весь экран","全屏","全画面","फ़ुल स्क्रीन"],"Full screen isn't available in this browser":["La pantalla completa no está disponible en este navegador","Tela cheia não está disponível neste navegador","Le plein écran n'est pas disponible dans ce navigateur","Vollbild ist in diesem Browser nicht verfügbar","Lo schermo intero non è disponibile in questo browser","Volledig scherm is niet beschikbaar in deze browser","Pełny ekran jest niedostępny w tej przeglądarce","Bu tarayıcıda tam ekran kullanılamıyor","Полноэкранный режим недоступен в этом браузере","此浏览器不支持全屏","このブラウザでは全画面を使えません","इस ब्राउज़र में फ़ुल स्क्रीन उपलब्ध नहीं है"],"Get the TV app":["Obtener la app de TV","Baixar o app de TV","Obtenir l'app TV","TV-App holen","Scarica l'app TV","TV-app downloaden","Pobierz aplikację TV","TV uygulamasını al","Приложение для ТВ","获取电视应用","テレビアプリを入手","TV ऐप पाएं"],"Gold":["Dorado","Dourado","Or","Gold","Oro","Goud","Złoty","Altın","Золотой","金色","ゴールド","सुनहरा"],"Google TV / Android TV / Fire TV: Downloader code {0}":["Google TV / Android TV / Fire TV: código de Downloader {0}","Google TV / Android TV / Fire TV: código do Downloader {0}","Google TV / Android TV / Fire TV : code Downloader {0}","Google TV / Android TV / Fire TV: Downloader-Code {0}","Google TV / Android TV / Fire TV: codice Downloader {0}","Google TV / Android TV / Fire TV: Downloader-code {0}","Google TV / Android TV / Fire TV: kod Downloader {0}","Google TV / Android TV / Fire TV: Downloader kodu {0}","Google TV / Android TV / Fire TV: код Downloader {0}","Google TV / Android TV / Fire TV：Downloader 代码 {0}","Google TV / Android TV / Fire TV：Downloader コード {0}","Google TV / Android TV / Fire TV: Downloader कोड {0}"],"Google TV, Android TV, Fire TV: install Downloader, enter {0}":["Google TV, Android TV, Fire TV: instala Downloader e introduce {0}","Google TV, Android TV, Fire TV: instale o Downloader e digite {0}","Google TV, Android TV, Fire TV : installez Downloader, saisissez {0}","Google TV, Android TV, Fire TV: Downloader installieren, {0} eingeben","Google TV, Android TV, Fire TV: installa Downloader, inserisci {0}","Google TV, Android TV, Fire TV: installeer Downloader, voer {0} in","Google TV, Android TV, Fire TV: zainstaluj Downloader, wpisz {0}","Google TV, Android TV, Fire TV: Downloader'ı yükleyin, {0} girin","Google TV, Android TV, Fire TV: установите Downloader, введите {0}","Google TV、Android TV、Fire TV：安装 Downloader，输入 {0}","Google TV、Android TV、Fire TV：Downloader を入れて {0} を入力","Google TV, Android TV, Fire TV: Downloader इंस्टॉल करें, {0} डालें"],"Green":["Verde","Verde","Vert","Grün","Verde","Groen","Zielony","Yeşil","Зелёный","绿色","グリーン","हरा"],"Home":["Inicio","Início","Accueil","Start","Home","Start","Start","Ana sayfa","Главная","主页","ホーム","होम"],"Its sites and teams are deleted":["Se borran sus sitios y equipos","Os sites e times dele são apagados","Ses sites et équipes sont supprimés","Seine Seiten und Teams werden gelöscht","I suoi siti e squadre vengono eliminati","De sites en teams worden verwijderd","Jego strony i drużyny zostaną usunięte","Siteleri ve takımları silinir","Его сайты и команды будут удалены","其网站和球队将被删除","サイトとチームも削除されます","इसकी साइटें और टीमें हट जाएंगी"],"L":["D","D","D","N","S","V","P","M","П","负","負","हार"],"Language":["Idioma","Idioma","Langue","Sprache","Lingua","Taal","Język","Dil","Язык","语言","言語","भाषा"],"Last":["Último","Último","Dernier","Letztes","Ultima","Laatste","Ostatni","Son","Последний","上一场","前回","पिछला"],"Link copied. Paste it into any browser.":["Enlace copiado. Pégalo en cualquier navegador.","Link copiado. Cole em qualquer navegador.","Lien copié. Collez-le dans n'importe quel navigateur.","Link kopiert. In einen beliebigen Browser einfügen.","Link copiato. Incollalo in qualsiasi browser.","Link gekopieerd. Plak hem in een browser.","Link skopiowany. Wklej go w dowolnej przeglądarce.","Bağlantı kopyalandı. Herhangi bir tarayıcıya yapıştırın.","Ссылка скопирована. Вставьте её в любой браузер.","链接已复制。粘贴到任意浏览器即可。","リンクをコピーしました。任意のブラウザに貼り付けてください。","लिंक कॉपी हो गया। इसे किसी भी ब्राउज़र में पेस्ट करें।"],"Live":["En vivo","Ao vivo","En direct","Live","Live","Live","Na żywo","Canlı","Идёт","直播","ライブ","लाइव"],"Loading teams…":["Cargando equipos…","Carregando times…","Chargement des équipes…","Teams werden geladen…","Caricamento squadre…","Teams laden…","Wczytywanie drużyn…","Takımlar yükleniyor…","Загрузка команд…","正在加载球队…","チームを読み込み中…","टीमें लोड हो रही हैं…"],"Loading weather…":["Cargando el clima…","Carregando o clima…","Chargement de la météo…","Wetter wird geladen…","Caricamento meteo…","Weer laden…","Wczytywanie pogody…","Hava durumu yükleniyor…","Загрузка погоды…","正在加载天气…","天気を読み込み中…","मौसम लोड हो रहा है…"],"Loading…":["Cargando…","Carregando…","Chargement…","Wird geladen…","Caricamento…","Laden…","Wczytywanie…","Yükleniyor…","Загрузка…","正在加载…","読み込み中…","लोड हो रहा है…"],"Me":["Yo","Eu","Moi","Ich","Io","Ik","Ja","Ben","Я","我","自分","मैं"],"Name (YouTube)":["Nombre (YouTube)","Nome (YouTube)","Nom (YouTube)","Name (YouTube)","Nome (YouTube)","Naam (YouTube)","Nazwa (YouTube)","Ad (YouTube)","Название (YouTube)","名称 (YouTube)","名前 (YouTube)","नाम (YouTube)"],"Next":["Próximos","Próximos","Prochains","Nächste","Prossime","Volgende","Następne","Sonraki","Далее","下一场","次回","अगला"],"Night":["Noche","Noite","Nuit","Nacht","Notte","Nacht","Noc","Gece","Ночь","夜晚","夜","रात"],"No game scheduled":["Sin partido programado","Sem jogo marcado","Aucun match prévu","Kein Spiel geplant","Nessuna partita in programma","Geen wedstrijd gepland","Brak zaplanowanych meczów","Planlı maç yok","Матчей нет","暂无赛程","試合予定なし","कोई मैच तय नहीं"],"No place found. Try another spelling.":["No se encontró el lugar. Prueba otra forma de escribirlo.","Lugar não encontrado. Tente outra grafia.","Lieu introuvable. Essayez une autre orthographe.","Kein Ort gefunden. Andere Schreibweise versuchen.","Nessun luogo trovato. Prova un'altra grafia.","Geen plaats gevonden. Probeer een andere spelling.","Nie znaleziono miejsca. Spróbuj innej pisowni.","Yer bulunamadı. Farklı bir yazım deneyin.","Место не найдено. Попробуйте другое написание.","未找到地点，请换个拼写。","場所が見つかりません。別の表記で試してください。","जगह नहीं मिली। दूसरी स्पेलिंग आज़माएं।"],"No sites yet.":["Aún no hay sitios.","Nenhum site ainda.","Aucun site pour l'instant.","Noch keine Seiten.","Ancora nessun sito.","Nog geen sites.","Brak stron.","Henüz site yok.","Сайтов пока нет.","还没有网站。","サイトはまだありません。","अभी कोई साइट नहीं।"],"None saved":["Ninguna guardada","Nenhuma salva","Aucune enregistrée","Keine gespeichert","Nessuna salvata","Geen opgeslagen","Brak zapisanych","Kayıtlı yok","Нет сохранённых","未保存","保存なし","कोई सेव नहीं"],"None — OK to add":["Ninguno — OK para agregar","Nenhum — OK para adicionar","Aucun — OK pour ajouter","Keine — OK zum Hinzufügen","Nessuno — OK per aggiungere","Geen — OK om toe te voegen","Brak — OK aby dodać","Yok — eklemek için OK","Нет — OK, чтобы добавить","无 — 按 OK 添加","なし — OKで追加","कोई नहीं — जोड़ने के लिए OK"],"OK to change · Back or Esc to close":["OK para cambiar · Atrás o Esc para cerrar","OK para alterar · Voltar ou Esc para fechar","OK pour modifier · Retour ou Échap pour fermer","OK zum Ändern · Zurück oder Esc zum Schließen","OK per cambiare · Indietro o Esc per chiudere","OK om te wijzigen · Terug of Esc om te sluiten","OK, aby zmienić · Wstecz lub Esc, aby zamknąć","Değiştirmek için OK · Kapatmak için Geri veya Esc","OK — изменить · Назад или Esc — закрыть","按 OK 更改 · 按返回或 Esc 关闭","OK で変更 · 戻る または Esc で閉じる","बदलने के लिए OK · बंद करने के लिए Back या Esc"],"OK to clear all":["OK para borrar todos","OK para apagar todos","OK pour tout effacer","OK zum Löschen aller","OK per cancellare tutti","OK om alles te wissen","OK, aby usunąć wszystkie","Hepsini silmek için OK","OK — удалить все","按 OK 全部清除","OK ですべて削除","सब हटाने के लिए OK"],"OK: scoreboard":["OK: marcador","OK: placar","OK : tableau","OK: Übersicht","OK: risultati","OK: scorebord","OK: tablica","OK: skor tablosu","OK: табло","OK：记分板","OK: スコアボード","OK: स्कोरबोर्ड"],"Ocean":["Océano","Oceano","Océan","Ozean","Oceano","Oceaan","Ocean","Okyanus","Океан","海洋","海","समुद्र"],"Off":["Desactivado","Desligado","Désactivé","Aus","Disattivato","Uit","Wył.","Kapalı","Выкл.","关","オフ","बंद"],"On your TV: install Downloader, enter {0}":["En tu TV: instala Downloader e introduce {0}","Na sua TV: instale o Downloader e digite {0}","Sur votre TV : installez Downloader, saisissez {0}","Auf dem Fernseher: Downloader installieren, {0} eingeben","Sulla TV: installa Downloader, inserisci {0}","Op je tv: installeer Downloader, voer {0} in","Na telewizorze: zainstaluj Downloader, wpisz {0}","TV'nizde: Downloader'ı yükleyin, {0} girin","На телевизоре: установите Downloader, введите {0}","在电视上：安装 Downloader，输入 {0}","テレビで Downloader を入れて {0} を入力","अपने TV पर: Downloader इंस्टॉल करें, {0} डालें"],"Online":["En línea","Online","En ligne","Online","Online","Online","Online","Çevrimiçi","В сети","在线","オンライン","ऑनलाइन"],"Open":["Abrir","Abrir","Ouvrir","Öffnen","Apri","Openen","Otwórz","Aç","Открыть","打开","開く","खोलें"],"Partly cloudy":["Parcialmente nublado","Parcialmente nublado","Partiellement nuageux","Teilweise bewölkt","Parzialmente nuvoloso","Half bewolkt","Częściowe zachmurzenie","Parçalı bulutlu","Переменная облачность","多云间晴","晴れ時々曇り","आंशिक बादल"],"Photos":["Fotos","Fotos","Photos","Fotos","Foto","Foto's","Zdjęcia","Fotoğraflar","Фото","照片","写真","फ़ोटो"],"Pick":["Elegir","Escolher","Choisir","Wählen","Scegli","Kiezen","Wybierz","Seç","Выбрать","选择","選択","चुनें"],"Pick a league":["Elige una liga","Escolha uma liga","Choisissez une ligue","Liga wählen","Scegli un campionato","Kies een competitie","Wybierz ligę","Lig seçin","Выберите лигу","选择联赛","リーグを選択","लीग चुनें"],"Pick your team":["Elige tu equipo","Escolha seu time","Choisissez votre équipe","Team wählen","Scegli la tua squadra","Kies je team","Wybierz drużynę","Takımınızı seçin","Выберите команду","选择你的球队","チームを選択","अपनी टीम चुनें"],"Pink":["Rosa","Rosa","Rose","Rosa","Rosa","Roze","Różowy","Pembe","Розовый","粉色","ピンク","गुलाबी"],"Press Edit sites to add YouTube, Netflix and more":["Pulsa Editar sitios para añadir YouTube, Netflix y más","Toque em Editar sites para adicionar YouTube, Netflix e mais","Appuyez sur Modifier les sites pour ajouter YouTube, Netflix et plus","Seiten bearbeiten drücken, um YouTube, Netflix und mehr hinzuzufügen","Premi Modifica siti per aggiungere YouTube, Netflix e altro","Druk op Sites bewerken om YouTube, Netflix en meer toe te voegen","Naciśnij Edytuj strony, aby dodać YouTube, Netflix i inne","YouTube, Netflix ve daha fazlasını eklemek için Siteleri düzenle'ye basın","Нажмите «Изменить сайты», чтобы добавить YouTube, Netflix и другие","按“编辑网站”添加 YouTube、Netflix 等","「サイトを編集」で YouTube や Netflix などを追加","YouTube, Netflix और भी जोड़ने के लिए साइटें संपादित करें दबाएं"],"Profile name":["Nombre del perfil","Nome do perfil","Nom du profil","Profilname","Nome del profilo","Profielnaam","Nazwa profilu","Profil adı","Имя профиля","个人资料名称","プロフィール名","प्रोफ़ाइल का नाम"],"Profile: {0}":["Perfil: {0}","Perfil: {0}","Profil : {0}","Profil: {0}","Profilo: {0}","Profiel: {0}","Profil: {0}","Profil: {0}","Профиль: {0}","个人资料：{0}","プロフィール：{0}","प्रोफ़ाइल: {0}"],"Profiles":["Perfiles","Perfis","Profils","Profile","Profili","Profielen","Profile","Profiller","Профили","个人资料","プロフィール","प्रोफ़ाइलें"],"Purple":["Morado","Roxo","Violet","Lila","Viola","Paars","Fioletowy","Mor","Фиолетовый","紫色","パープル","बैंगनी"],"QR code or link with your setup":["Código QR o enlace con tu configuración","Código QR ou link com sua configuração","Code QR ou lien avec votre configuration","QR-Code oder Link mit deiner Einrichtung","Codice QR o link con la tua configurazione","QR-code of link met je instellingen","Kod QR lub link z Twoimi ustawieniami","Kurulumunuzla QR kod veya bağlantı","QR-код или ссылка с вашими настройками","包含你设置的二维码或链接","設定入りの QR コードまたはリンク","आपके सेटअप वाला QR कोड या लिंक"],"Rain":["Lluvia","Chuva","Pluie","Regen","Pioggia","Regen","Deszcz","Yağmur","Дождь","雨","雨","बारिश"],"Recently opened":["Abiertas recientemente","Abertos recentemente","Ouvertes récemment","Zuletzt geöffnet","Aperte di recente","Recent geopend","Ostatnio otwierane","Son açılanlar","Недавно открытые","最近打开","最近開いたアプリ","हाल में खोले गए"],"Remove":["Quitar","Remover","Retirer","Entfernen","Rimuovi","Verwijderen","Usuń","Kaldır","Удалить","移除","削除","हटाएँ"],"Remove world clocks":["Quitar relojes mundiales","Remover relógios mundiais","Supprimer les horloges","Weltuhren entfernen","Rimuovi orologi mondiali","Wereldklokken verwijderen","Usuń zegary światowe","Dünya saatlerini kaldır","Удалить мировые часы","移除世界时钟","世界時計を削除","विश्व घड़ियां हटाएं"],"Remove your photos":["Quitar tus fotos","Remover suas fotos","Supprimer vos photos","Eigene Fotos entfernen","Rimuovi le tue foto","Je foto's verwijderen","Usuń swoje zdjęcia","Fotoğraflarını kaldır","Удалить свои фото","移除你的照片","写真を削除","अपनी फ़ोटो हटाएं"],"Remove {0}":["Eliminar {0}","Remover {0}","Supprimer {0}","{0} entfernen","Rimuovi {0}","{0} verwijderen","Usuń {0}","{0} kaldır","Удалить {0}","移除 {0}","{0} を削除","{0} हटाएं"],"Rename {0}":["Renombrar {0}","Renomear {0}","Renommer {0}","{0} umbenennen","Rinomina {0}","{0} hernoemen","Zmień nazwę: {0}","{0} adını değiştir","Переименовать {0}","重命名 {0}","{0} の名前を変更","{0} का नाम बदलें"],"Rotate every 15 min":["Cambiar cada 15 min","Alternar a cada 15 min","Changer toutes les 15 min","Alle 15 Min. wechseln","Cambia ogni 15 min","Elke 15 min wisselen","Zmieniaj co 15 min","15 dakikada bir değiştir","Менять каждые 15 мин","每 15 分钟轮换","15分ごとに切り替え","हर 15 मिनट में बदलें"],"Save":["Guardar","Salvar","Enregistrer","Speichern","Salva","Opslaan","Zapisz","Kaydet","Сохранить","保存","保存","सेव करें"],"Scan with a phone, or copy the link and open it on your work computer. It carries your sites, weather, clocks, colors and teams.":["Escanéalo con el móvil o copia el enlace y ábrelo en el ordenador del trabajo. Lleva tus sitios, clima, relojes, colores y equipos.","Escaneie com o celular ou copie o link e abra no computador do trabalho. Ele leva seus sites, clima, relógios, cores e times.","Scannez avec un téléphone, ou copiez le lien et ouvrez-le sur l'ordinateur du travail. Il contient vos sites, météo, horloges, couleurs et équipes.","Mit dem Handy scannen oder den Link kopieren und am Arbeitsrechner öffnen. Er enthält deine Seiten, Wetter, Uhren, Farben und Teams.","Scansiona con il telefono o copia il link e aprilo sul computer di lavoro. Contiene siti, meteo, orologi, colori e squadre.","Scan met een telefoon of kopieer de link en open hem op je werkcomputer. Hij bevat je sites, weer, klokken, kleuren en teams.","Zeskanuj telefonem albo skopiuj link i otwórz go na komputerze w pracy. Zawiera strony, pogodę, zegary, kolory i drużyny.","Telefonla tarayın veya bağlantıyı kopyalayıp iş bilgisayarınızda açın. Sitelerinizi, hava durumunu, saatleri, renkleri ve takımları taşır.","Отсканируйте телефоном или скопируйте ссылку и откройте на рабочем компьютере. В ней ваши сайты, погода, часы, цвета и команды.","用手机扫描，或复制链接在工作电脑上打开。它包含你的网站、天气、时钟、颜色和球队。","スマホでスキャンするか、リンクをコピーして職場のパソコンで開いてください。サイト、天気、時計、色、チームが引き継がれます。","फ़ोन से स्कैन करें, या लिंक कॉपी करके ऑफ़िस के कंप्यूटर पर खोलें। इसमें आपकी साइटें, मौसम, घड़ियां, रंग और टीमें होती हैं।"],"Scoreboard":["Marcador","Placar","Tableau des scores","Spielübersicht","Risultati","Scorebord","Tablica wyników","Skor tablosu","Табло","记分板","スコアボード","स्कोरबोर्ड"],"Scores":["Resultados","Placar","Scores","Ergebnisse","Risultati","Uitslagen","Wyniki","Skorlar","Счёт","比分","スコア","स्कोर"],"Scores unavailable":["Resultados no disponibles","Placar indisponível","Scores indisponibles","Ergebnisse nicht verfügbar","Risultati non disponibili","Uitslagen niet beschikbaar","Wyniki niedostępne","Skorlar alınamadı","Счёт недоступен","比分不可用","スコアを取得できません","स्कोर उपलब्ध नहीं"],"Screensaver":["Salvapantallas","Protetor de tela","Écran de veille","Bildschirmschoner","Salvaschermo","Schermbeveiliging","Wygaszacz","Ekran koruyucu","Заставка","屏幕保护","スクリーンセーバー","स्क्रीनसेवर"],"Screensaver after":["Salvapantallas tras","Protetor de tela após","Écran de veille après","Bildschirmschoner nach","Salvaschermo dopo","Schermbeveiliging na","Wygaszacz po","Ekran koruyucu süresi","Заставка через","屏幕保护启动时间","スクリーンセーバーまで","स्क्रीनसेवर इतनी देर बाद"],"Search":["Buscar","Pesquisar","Rechercher","Suchen","Cerca","Zoeken","Szukaj","Ara","Поиск","搜索","検索","खोजें"],"Search failed. Check the connection and try again.":["La búsqueda falló. Revisa la conexión e inténtalo de nuevo.","A busca falhou. Verifique a conexão e tente de novo.","La recherche a échoué. Vérifiez la connexion et réessayez.","Suche fehlgeschlagen. Verbindung prüfen und erneut versuchen.","Ricerca non riuscita. Controlla la connessione e riprova.","Zoeken mislukt. Controleer de verbinding en probeer opnieuw.","Wyszukiwanie nie powiodło się. Sprawdź połączenie i spróbuj ponownie.","Arama başarısız. Bağlantıyı kontrol edip tekrar deneyin.","Поиск не удался. Проверьте подключение и повторите.","搜索失败，请检查网络后重试。","検索に失敗しました。接続を確認して再試行してください。","खोज नहीं हो सकी। कनेक्शन जांचें और फिर कोशिश करें।"],"Searching…":["Buscando…","Buscando…","Recherche…","Suche…","Ricerca…","Zoeken…","Szukanie…","Aranıyor…","Поиск…","正在搜索…","検索中…","खोज रहे हैं…"],"Selected":["Seleccionado","Selecionado","Sélectionné","Ausgewählt","Selezionato","Geselecteerd","Wybrane","Seçili","Выбрано","已选择","選択中","चुना गया"],"Send to another device":["Enviar a otro dispositivo","Enviar para outro dispositivo","Envoyer vers un autre appareil","An anderes Gerät senden","Invia a un altro dispositivo","Naar ander apparaat sturen","Wyślij na inne urządzenie","Başka cihaza gönder","Отправить на другое устройство","发送到其他设备","別のデバイスに送る","दूसरे डिवाइस पर भेजें"],"Settings":["Ajustes","Configurações","Paramètres","Einstellungen","Impostazioni","Instellingen","Ustawienia","Ayarlar","Настройки","设置","設定","सेटिंग्स"],"Share…":["Compartir…","Compartilhar…","Partager…","Teilen…","Condividi…","Delen…","Udostępnij…","Paylaş…","Поделиться…","分享…","共有…","शेयर करें…"],"Showers":["Chubascos","Pancadas","Averses","Schauer","Rovesci","Buien","Przelotne opady","Sağanak","Ливни","阵雨","にわか雨","बौछारें"],"Sites":["Sitios","Sites","Sites","Seiten","Siti","Sites","Strony","Siteler","Сайты","网站","サイト","साइटें"],"Snow":["Nieve","Neve","Neige","Schnee","Neve","Sneeuw","Śnieg","Kar","Снег","雪","雪","बर्फ़"],"Snow showers":["Chubascos de nieve","Pancadas de neve","Averses de neige","Schneeschauer","Rovesci di neve","Sneeuwbuien","Przelotny śnieg","Kar sağanağı","Снегопад","阵雪","にわか雪","बर्फ़ की बौछारें"],"Soccer · Americas":["Fútbol · América","Futebol · Américas","Football · Amériques","Fußball · Amerika","Calcio · Americhe","Voetbal · Amerika","Piłka nożna · Ameryki","Futbol · Amerika","Футбол · Америка","足球 · 美洲","サッカー · 南北アメリカ","फ़ुटबॉल · अमेरिका"],"Soccer · Asia, Africa & Oceania":["Fútbol · Asia, África y Oceanía","Futebol · Ásia, África e Oceania","Football · Asie, Afrique et Océanie","Fußball · Asien, Afrika & Ozeanien","Calcio · Asia, Africa e Oceania","Voetbal · Azië, Afrika en Oceanië","Piłka nożna · Azja, Afryka i Oceania","Futbol · Asya, Afrika ve Okyanusya","Футбол · Азия, Африка и Океания","足球 · 亚洲、非洲和大洋洲","サッカー · アジア・アフリカ・オセアニア","फ़ुटबॉल · एशिया, अफ़्रीका और ओशिनिया"],"Soccer · Europe":["Fútbol · Europa","Futebol · Europa","Football · Europe","Fußball · Europa","Calcio · Europa","Voetbal · Europa","Piłka nożna · Europa","Futbol · Avrupa","Футбол · Европа","足球 · 欧洲","サッカー · ヨーロッパ","फ़ुटबॉल · यूरोप"],"Soccer · International":["Fútbol · Internacional","Futebol · Internacional","Football · International","Fußball · International","Calcio · Internazionale","Voetbal · Internationaal","Piłka nożna · Międzynarodowe","Futbol · Uluslararası","Футбол · Международный","足球 · 国际","サッカー · 国際","फ़ुटबॉल · अंतरराष्ट्रीय"],"Sports teams":["Equipos deportivos","Times","Équipes sportives","Sportteams","Squadre","Sportteams","Drużyny","Spor takımları","Спортивные команды","运动队","スポーツチーム","खेल टीमें"],"Sunset":["Atardecer","Pôr do sol","Coucher de soleil","Sonnenuntergang","Tramonto","Zonsondergang","Zachód słońca","Gün batımı","Закат","日落","夕焼け","सूर्यास्त"],"Switch":["Cambiar","Trocar","Changer","Wechseln","Cambia","Wisselen","Przełącz","Geç","Переключить","切换","切り替え","बदलें"],"Temperature":["Temperatura","Temperatura","Température","Temperatur","Temperatura","Temperatuur","Temperatura","Sıcaklık","Температура","温度","気温","तापमान"],"That setup link didn't work. Make a new one on the TV.":["Ese enlace no funcionó. Crea uno nuevo en la TV.","Esse link não funcionou. Crie um novo na TV.","Ce lien n'a pas fonctionné. Créez-en un nouveau sur la TV.","Dieser Link hat nicht funktioniert. Erstelle auf dem Fernseher einen neuen.","Quel link non ha funzionato. Creane uno nuovo sulla TV.","Die link werkte niet. Maak een nieuwe op de tv.","Ten link nie zadziałał. Utwórz nowy na telewizorze.","Bu bağlantı çalışmadı. TV'de yenisini oluşturun.","Ссылка не сработала. Создайте новую на телевизоре.","该设置链接无效，请在电视上重新生成。","このリンクは使えません。テレビで新しく作成してください。","यह लिंक काम नहीं किया। TV पर नया बनाएं।"],"This browser only — OK to pick":["Solo este navegador — OK para elegir","Só neste navegador — OK para escolher","Ce navigateur uniquement — OK pour choisir","Nur dieser Browser — OK zum Auswählen","Solo questo browser — OK per scegliere","Alleen deze browser — OK om te kiezen","Tylko ta przeglądarka — OK, aby wybrać","Yalnızca bu tarayıcı — seçmek için OK","Только этот браузер — OK, чтобы выбрать","仅限此浏览器 — 按 OK 选择","このブラウザのみ — OK で選択","सिर्फ़ यह ब्राउज़र — चुनने के लिए OK"],"This device's time":["Hora de este dispositivo","Hora deste dispositivo","Heure de cet appareil","Zeit dieses Geräts","Ora di questo dispositivo","Tijd van dit apparaat","Czas tego urządzenia","Bu cihazın saati","Время этого устройства","此设备的时间","このデバイスの時刻","इस डिवाइस का समय"],"Thunderstorm":["Tormenta","Tempestade","Orage","Gewitter","Temporale","Onweer","Burza","Gök gürültülü fırtına","Гроза","雷雨","雷雨","आंधी-तूफ़ान"],"Today":["Hoy","Hoje","Aujourd'hui","Heute","Oggi","Vandaag","Dziś","Bugün","Сегодня","今天","今日","आज"],"Type a city or a country, e.g. Paris or Japan. Add a comma to narrow it down: Paris, Texas":["Escribe una ciudad o un país, p. ej. París o Japón. Añade una coma para precisar: Paris, Texas","Digite uma cidade ou país, ex.: Paris ou Japão. Use vírgula para refinar: Paris, Texas","Saisissez une ville ou un pays, ex. Paris ou Japon. Ajoutez une virgule pour préciser : Paris, Texas","Stadt oder Land eingeben, z. B. Paris oder Japan. Mit Komma eingrenzen: Paris, Texas","Scrivi una città o un paese, es. Parigi o Giappone. Aggiungi una virgola per restringere: Paris, Texas","Typ een stad of land, bijv. Parijs of Japan. Gebruik een komma om te verfijnen: Paris, Texas","Wpisz miasto lub kraj, np. Paryż lub Japonia. Dodaj przecinek, aby zawęzić: Paris, Texas","Bir şehir veya ülke yazın, ör. Paris veya Japonya. Daraltmak için virgül ekleyin: Paris, Texas","Введите город или страну, например Париж или Япония. Уточните через запятую: Paris, Texas","输入城市或国家，例如 巴黎 或 日本。用逗号缩小范围：Paris, Texas","都市名か国名を入力（例：パリ、日本）。カンマで絞り込み：Paris, Texas","शहर या देश लिखें, जैसे Paris या Japan. सीमित करने के लिए कॉमा लगाएं: Paris, Texas"],"US sports":["Deportes de EE. UU.","Esportes dos EUA","Sports américains","US-Sport","Sport USA","Amerikaanse sport","Sport w USA","ABD sporları","Спорт США","美国体育","アメリカのスポーツ","अमेरिकी खेल"],"Up to 5 teams. Scores show under the menu; OK on them opens the scoreboard.":["Hasta 5 equipos. Los marcadores aparecen bajo el menú; OK abre el marcador completo.","Até 5 times. Os placares aparecem sob o menu; OK abre o placar completo.","Jusqu'à 5 équipes. Les scores s'affichent sous le menu ; OK ouvre le tableau.","Bis zu 5 Teams. Ergebnisse stehen unter dem Menü; OK öffnet die Anzeigetafel.","Fino a 5 squadre. I risultati appaiono sotto il menu; OK apre il tabellone.","Tot 5 teams. Uitslagen staan onder het menu; OK opent het scorebord.","Do 5 drużyn. Wyniki są pod menu; OK otwiera tablicę wyników.","En fazla 5 takım. Skorlar menünün altında; OK skor tablosunu açar.","До 5 команд. Счёт под меню; OK открывает табло.","最多 5 支球队。比分显示在菜单下方，按 OK 打开记分板。","最大5チーム。スコアはメニューの下に表示され、OK でスコアボードを開きます。","अधिकतम 5 टीमें। स्कोर मेनू के नीचे दिखते हैं; OK दबाने पर स्कोरबोर्ड खुलता है।"],"Up to 8 sites. OK on one to remove it.":["Hasta 8 sitios. OK en uno para quitarlo.","Até 8 sites. OK em um para removê-lo.","Jusqu'à 8 sites. OK sur un site pour le supprimer.","Bis zu 8 Seiten. OK auf einer entfernt sie.","Fino a 8 siti. OK su uno per rimuoverlo.","Tot 8 sites. OK op een site om hem te verwijderen.","Do 8 stron. OK na stronie, aby ją usunąć.","En fazla 8 site. Kaldırmak için birinde OK.","До 8 сайтов. OK на сайте — удалить.","最多 8 个网站。在网站上按 OK 可移除。","最大8サイト。OK で削除します。","अधिकतम 8 साइटें। हटाने के लिए उस पर OK दबाएं।"],"Updated {0}":["Actualizado {0}","Atualizado {0}","Mis à jour {0}","Aktualisiert {0}","Aggiornato {0}","Bijgewerkt {0}","Zaktualizowano {0}","Güncellendi {0}","Обновлено {0}","更新于 {0}","更新 {0}","अपडेट {0}"],"W":["G","V","V","S","V","W","W","G","В","胜","勝","जीत"],"Weather":["Clima","Clima","Météo","Wetter","Meteo","Weer","Pogoda","Hava","Погода","天气","天気","मौसम"],"Weather alert":["Alerta meteorológica","Alerta meteorológico","Alerte météo","Wetterwarnung","Allerta meteo","Weeralarm","Ostrzeżenie pogodowe","Hava uyarısı","Погодное предупреждение","天气预警","気象警報","मौसम चेतावनी"],"Weather location":["Ubicación del clima","Local do clima","Lieu météo","Wetterort","Località meteo","Weerlocatie","Lokalizacja pogody","Hava durumu konumu","Место для погоды","天气位置","天気の地域","मौसम का स्थान"],"Weather unavailable":["Clima no disponible","Clima indisponível","Météo indisponible","Wetter nicht verfügbar","Meteo non disponibile","Weer niet beschikbaar","Pogoda niedostępna","Hava durumu yok","Погода недоступна","天气不可用","天気を取得できません","मौसम उपलब्ध नहीं"],"Weather: {0}":["Clima: {0}","Clima: {0}","Météo : {0}","Wetter: {0}","Meteo: {0}","Weer: {0}","Pogoda: {0}","Hava: {0}","Погода: {0}","天气：{0}","天気：{0}","मौसम: {0}"],"White":["Blanco","Branco","Blanc","Weiß","Bianco","Wit","Biały","Beyaz","Белый","白色","ホワイト","सफ़ेद"],"World clocks":["Relojes mundiales","Relógios mundiais","Horloges mondiales","Weltuhren","Orologi mondiali","Wereldklokken","Zegary światowe","Dünya saatleri","Мировое время","世界时钟","世界時計","विश्व घड़ियाँ"],"You have 8 sites. Remove one first.":["Tienes 8 sitios. Quita uno primero.","Você tem 8 sites. Remova um primeiro.","Vous avez 8 sites. Supprimez-en un d'abord.","Du hast 8 Seiten. Entferne zuerst eine.","Hai 8 siti. Rimuovine prima uno.","Je hebt 8 sites. Verwijder er eerst een.","Masz 8 stron. Najpierw usuń jedną.","8 siteniz var. Önce birini kaldırın.","У вас 8 сайтов. Сначала удалите один.","你已有 8 个网站，请先移除一个。","8サイトあります。先に1つ削除してください。","आपकी 8 साइटें हैं। पहले एक हटाएं।"],"Your photos":["Tus fotos","Suas fotos","Vos photos","Deine Fotos","Le tue foto","Je foto's","Twoje zdjęcia","Fotoğrafların","Ваши фото","你的照片","あなたの写真","आपकी फ़ोटो"],"Your setup is here: {0} apps as websites, {1} weather":["Tu configuración está aquí: {0} apps como sitios web, clima de {1}","Sua configuração chegou: {0} apps como sites, clima de {1}","Votre configuration est là : {0} apps en sites web, météo de {1}","Deine Einrichtung ist da: {0} Apps als Webseiten, Wetter für {1}","La tua configurazione è qui: {0} app come siti, meteo di {1}","Je instellingen zijn er: {0} apps als websites, weer voor {1}","Twoje ustawienia są tutaj: {0} aplikacji jako strony, pogoda: {1}","Kurulumunuz burada: web sitesi olarak {0} uygulama, {1} hava durumu","Ваши настройки здесь: {0} прил. как сайты, погода: {1}","你的设置已同步：{0} 个应用转为网站，{1} 天气","設定を読み込みました：アプリ {0} 個をサイトとして、{1} の天気","आपका सेटअप यहां है: {0} ऐप वेबसाइट के रूप में, {1} का मौसम"],"Your sites":["Tus sitios","Seus sites","Vos sites","Deine Seiten","I tuoi siti","Je sites","Twoje strony","Siteleriniz","Ваши сайты","你的网站","あなたのサイト","आपकी साइटें"],"{0} minutes":["{0} minutos","{0} minutos","{0} minutes","{0} Minuten","{0} minuti","{0} minuten","{0} min","{0} dakika","{0} мин","{0} 分钟","{0} 分","{0} मिनट"],"{0} on this browser":["{0} en este navegador","{0} neste navegador","{0} sur ce navigateur","{0} in diesem Browser","{0} su questo browser","{0} in deze browser","{0} w tej przeglądarce","bu tarayıcıda {0}","{0} в этом браузере","此浏览器上有 {0} 个","このブラウザに {0} 件","इस ब्राउज़र पर {0}"],"{0} photos added":["{0} fotos añadidas","{0} fotos adicionadas","{0} photos ajoutées","{0} Fotos hinzugefügt","{0} foto aggiunte","{0} foto's toegevoegd","Dodano zdjęcia: {0}","{0} fotoğraf eklendi","Добавлено фото: {0}","已添加 {0} 张照片","写真を{0}枚追加しました","{0} फ़ोटो जोड़ी गईं"],"{0} saved — OK to remove":["{0} guardadas — OK para quitar","{0} salvas — OK para remover","{0} enregistrées — OK pour supprimer","{0} gespeichert — OK zum Entfernen","{0} salvate — OK per rimuovere","{0} opgeslagen — OK om te verwijderen","Zapisane: {0} — OK, aby usunąć","{0} kayıtlı — kaldırmak için OK","Сохранено: {0} — OK, чтобы удалить","已保存 {0} 张 — 按 OK 移除","{0}枚保存 — OK で削除","{0} सेव — हटाने के लिए OK"],"{0} sites — OK to edit":["{0} sitios — OK para editar","{0} sites — OK para editar","{0} sites — OK pour modifier","{0} Seiten — OK zum Bearbeiten","{0} siti — OK per modificare","{0} sites — OK om te bewerken","Strony: {0} — OK, aby edytować","{0} site — düzenlemek için OK","Сайтов: {0} — OK, чтобы изменить","{0} 个网站 — 按 OK 编辑","{0} サイト — OK で編集","{0} साइटें — संपादित करने के लिए OK"],"{0} teams":["{0} equipos","{0} times","{0} équipes","{0} Teams","{0} squadre","{0} teams","drużyny: {0}","{0} takım","команд: {0}","{0} 支球队","{0} チーム","{0} टीमें"],"{0} time":["Hora de {0}","Hora de {0}","Heure de {0}","Zeit in {0}","Ora di {0}","Tijd in {0}","Czas: {0}","{0} saati","Время: {0}","{0} 时间","{0} の時刻","{0} का समय"],"{0} world clocks":["{0} relojes mundiales","{0} relógios mundiais","{0} horloges","{0} Weltuhren","{0} orologi","{0} wereldklokken","zegary: {0}","{0} dünya saati","часы: {0}","{0} 个世界时钟","世界時計 {0} 個","{0} विश्व घड़ियां"],"{0} — OK to add":["{0} — OK para añadir","{0} — OK para adicionar","{0} — OK pour ajouter","{0} — OK zum Hinzufügen","{0} — OK per aggiungere","{0} — OK om toe te voegen","{0} — OK, aby dodać","{0} — eklemek için OK","{0} — OK, чтобы добавить","{0} — 按 OK 添加","{0} — OK で追加","{0} — जोड़ने के लिए OK"],"{0} — OK to change":["{0} — OK para cambiar","{0} — OK para alterar","{0} — OK pour modifier","{0} — OK zum Ändern","{0} — OK per cambiare","{0} — OK om te wijzigen","{0} — OK, aby zmienić","{0} — değiştirmek için OK","{0} — OK, чтобы изменить","{0} — 按 OK 更改","{0} — OK で変更","{0} — बदलने के लिए OK"],"News headlines":["Titulares","Manchetes","Gros titres","Schlagzeilen","Titoli","Nieuwskoppen","Nagłówki wiadomości","Haber başlıkları","Новости","新闻头条","ニュース見出し","समाचार सुर्खियाँ"],"Top stories":["Noticias principales","Principais notícias","À la une","Top-Meldungen","Notizie principali","Topverhalen","Najważniejsze","Manşetler","Главное","要闻","トップニュース","मुख्य समाचार"],"On":["Activado","Ligado","Activé","An","Attivo","Aan","Wł.","Açık","Вкл.","开","オン","चालू"]};
+var lang = store.get("lang", -1);
+function T(k) {
+  var r = lang > 0 && I18N[k], s = (r && r[lang - 1]) || k;
+  for (var i = 1; i < arguments.length; i++) s = s.split("{" + (i - 1) + "}").join(arguments[i]);
+  return s;
+}
+function LOC() { return LOCALES[Math.max(0, lang)]; }
+function applyLang() {
+  document.documentElement.lang = LANGS[Math.max(0, lang)];
+  Array.prototype.forEach.call(document.querySelectorAll("[data-t]"), function (e) { e.textContent = T(e.getAttribute("data-t")); });
+  Array.prototype.forEach.call(document.querySelectorAll("[data-tp]"), function (e) { e.placeholder = T(e.getAttribute("data-tp")); });
+}
+// ---------- profiles: each one keeps its own sites, recent list, accent, background and teams ----------
+var profiles = store.get("profiles", [{ id: 0, n: "Me" }]), profId = store.get("prof", 0), nextProf = store.get("nextProf", 1);
+if (!profiles.some(function (p) { return p.id === profId; })) profId = 0;
+function pk(k) { return profId ? "p" + profId + "." + k : k; }
+var PER = { links: 1, accent: 1, scene: 1, teams: 1 };
+function curProf() { for (var i = 0; i < profiles.length; i++) if (profiles[i].id === profId) return profiles[i]; return profiles[0]; }
+function profName(p) { return p.n === "Me" ? T("Me") : p.n; }
+var DEFAULT_LINKS = [
+  { n: "YouTube", u: "https://www.youtube.com/tv" }, { n: "Netflix", u: "https://www.netflix.com" },
+  { n: "Prime Video", u: "https://www.primevideo.com" }, { n: "Pluto TV", u: "https://pluto.tv" },
+  { n: "Tubi", u: "https://tubitv.com" }, { n: "Spotify", u: "https://open.spotify.com" }
+];
+var ACCENTS = [["Blue", "#9fd6ff"], ["Gold", "#ffd27a"], ["Green", "#8cf0b4"], ["Pink", "#ff9fd0"], ["Purple", "#c3a6ff"], ["White", "#ffffff"]];
+var SCENES = ["Sunset", "Aurora", "Ocean", "Forest", "Night"];
+var cfg = {
+  place: store.get("place", { name: "Houston", lat: 29.7604, lon: -95.3698, cc: "US", tz: "America/Chicago" }),
+  celsius: store.get("celsius", false),
+  clock: store.get("clock", 0),          // 0 = 24-hour, 1 = 12-hour
+  tzPlace: store.get("tzPlace", true),
+  news: store.get("news", false),
+  worlds: store.get("worlds", []),
+  scene: store.get(pk("scene"), 0),          // index into SCENES, or 99 = rotate, 98 = your photos
+  accent: store.get(pk("accent"), 0),
+  saverMin: store.get("saverMin", 5),
+  links: store.get(pk("links"), DEFAULT_LINKS),
+  teams: store.get(pk("teams"), [])
+};
+function save(k) { store.set(PER[k] ? pk(k) : k, cfg[k]); }
+var $ = function (id) { return document.getElementById(id); };
+
+// ---------- scale the 1920x1080 stage to the screen ----------
+function fit() {
+  var s = Math.min(innerWidth / 1920, innerHeight / 1080);
+  $("stage").style.transform = "scale(" + s + ") translate(-50%, -50%)";
+  $("stage").style.transformOrigin = "0 0";
+  $("stage").style.left = "50%"; $("stage").style.top = "50%";
+  $("stage").style.transform = "translate(-50%, -50%) scale(" + s + ")";
+  $("stage").style.transformOrigin = "center center";
+  drawScene();
+}
+addEventListener("resize", fit);
+
+// ---------- backgrounds drawn in code ----------
+var PAL = {
+  Sunset: ["#1b1440", "#5b2a6e", "#d9657a", "#f7b267", "#2a1a3a", "#140f26"],
+  Aurora: ["#03121f", "#06303f", "#0e6b6b", "#40e0b0", "#0b2230", "#06131c"],
+  Ocean: ["#041b33", "#0a3d66", "#1f7fb3", "#7fd3f0", "#062743", "#03182b"],
+  Forest: ["#0c1a12", "#1d3b26", "#3f6b3b", "#c9d98a", "#132a1a", "#0a160e"],
+  Night: ["#05060f", "#0c1030", "#22285e", "#6b6fb5", "#0a0c22", "#05060f"]
+};
+var sceneNow = 0, photos = [], photoIdx = 0;
+function rnd(seed) { return function () { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; }; }
+function drawScene() {
+  var c = $("bg"), w = innerWidth, h = innerHeight, dpr = Math.min(2, devicePixelRatio || 1);
+  c.width = w * dpr; c.height = h * dpr; var g = c.getContext("2d"); g.scale(dpr, dpr);
+  var p = PAL[SCENES[sceneNow]] || PAL.Sunset;
+  var sky = g.createLinearGradient(0, 0, 0, h);
+  sky.addColorStop(0, p[0]); sky.addColorStop(.45, p[1]); sky.addColorStop(.72, p[2]); sky.addColorStop(.86, p[3]);
+  g.fillStyle = sky; g.fillRect(0, 0, w, h);
+  var r = rnd(7);
+  for (var i = 0; i < 120; i++) { g.fillStyle = "rgba(255,255,255," + (r() * .5) + ")"; g.fillRect(r() * w, r() * h * .5, 1.5, 1.5); }
+  if (SCENES[sceneNow] === "Aurora") {
+    for (var a = 0; a < 3; a++) {
+      var ag = g.createLinearGradient(0, h * .1, 0, h * .6);
+      ag.addColorStop(0, "rgba(64,224,176,0)"); ag.addColorStop(.5, "rgba(64,224,176," + (.18 - a * .04) + ")"); ag.addColorStop(1, "rgba(64,224,176,0)");
+      g.fillStyle = ag; g.beginPath(); g.moveTo(0, h * (.25 + a * .06));
+      for (var x = 0; x <= w; x += 40) g.lineTo(x, h * (.22 + a * .06) + Math.sin(x / 180 + a) * 40);
+      g.lineTo(w, h * .7); g.lineTo(0, h * .7); g.fill();
+    }
+  } else {
+    var mg = g.createRadialGradient(w * .62, h * .2, 0, w * .62, h * .2, h * .24);
+    mg.addColorStop(0, "rgba(255,240,230,.55)"); mg.addColorStop(.6, "rgba(255,220,220,.18)"); mg.addColorStop(1, "rgba(255,220,220,0)");
+    g.fillStyle = mg; g.fillRect(0, 0, w, h);
+  }
+  var layers = [[.62, p[4], .9], [.72, p[5], 1]];
+  layers.forEach(function (L, k) {
+    var rr = rnd(11 + k * 5); g.fillStyle = L[1]; g.globalAlpha = L[2]; g.beginPath(); g.moveTo(0, h);
+    var y = h * L[0];
+    for (var x = 0; x <= w + 80; x += 80) { y = h * L[0] + (rr() - .5) * h * .12; g.lineTo(x, y); }
+    g.lineTo(w, h); g.closePath(); g.fill(); g.globalAlpha = 1;
+  });
+  var vg = g.createLinearGradient(0, h * .7, 0, h); vg.addColorStop(0, "rgba(0,0,0,0)"); vg.addColorStop(1, "rgba(0,0,0,.45)");
+  g.fillStyle = vg; g.fillRect(0, h * .7, w, h * .3);
+}
+function applyBackground() {
+  if (cfg.scene === 98 && photos.length) { showPhoto(); return; }
+  $("bgPhoto").classList.remove("on");
+  sceneNow = cfg.scene >= 0 && cfg.scene < SCENES.length ? cfg.scene : sceneNow;
+  drawScene();
+}
+function showPhoto() { var el = $("bgPhoto"); el.style.backgroundImage = "url(" + photos[photoIdx % photos.length] + ")"; el.classList.add("on"); }
+setInterval(function () {
+  if (cfg.scene === 99) { sceneNow = (sceneNow + 1) % SCENES.length; drawScene(); }
+  else if (cfg.scene === 98 && photos.length > 1) { photoIdx++; showPhoto(); }
+}, 15 * 60 * 1000);
+
+// ---------- your photos (computers and phones; kept in this browser only) ----------
+var db = null;
+function openDb(cb) {
+  try {
+    var r = indexedDB.open("wlhglass", 1);
+    r.onupgradeneeded = function () { r.result.createObjectStore("photos", { autoIncrement: true }); };
+    r.onsuccess = function () { db = r.result; cb(); };
+    r.onerror = function () { cb(); };
+  } catch (e) { cb(); }
+}
+function loadPhotos(cb) {
+  photos = []; if (!db) { cb && cb(); return; }
+  try {
+    var q = db.transaction("photos").objectStore("photos").openCursor();
+    q.onsuccess = function () { var cur = q.result; if (cur) { photos.push(cur.value); cur.continue(); } else cb && cb(); };
+    q.onerror = function () { cb && cb(); };
+  } catch (e) { cb && cb(); }
+}
+function addPhotos(files) {
+  var left = files.length; if (!left) return;
+  Array.prototype.forEach.call(files, function (f) {
+    var u = URL.createObjectURL(f), im = new Image();
+    im.onload = function () {
+      var s = Math.min(1, 1920 / Math.max(im.width, im.height)), c = document.createElement("canvas");
+      c.width = Math.round(im.width * s); c.height = Math.round(im.height * s); c.getContext("2d").drawImage(im, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(u);
+      var d = c.toDataURL("image/jpeg", .88);
+      try { db.transaction("photos", "readwrite").objectStore("photos").add(d); } catch (e) {}
+      photos.push(d);
+      if (--left === 0) { cfg.scene = 98; save("scene"); photoIdx = photos.length - 1; applyBackground(); flash(files.length === 1 ? T("1 photo added") : T("{0} photos added", files.length)); renderSettings(); }
+    };
+    im.onerror = function () { --left; flash(T("Couldn't read one of the photos")); };
+    im.src = u;
+  });
+}
+function clearPhotos() { try { db.transaction("photos", "readwrite").objectStore("photos").clear(); } catch (e) {} photos = []; if (cfg.scene === 98) { cfg.scene = 0; save("scene"); } applyBackground(); }
+
+// ---------- clock ----------
+function zone() { return cfg.tzPlace && cfg.place.tz ? cfg.place.tz : undefined; }
+function fmt(d, opt, tz) { try { if (tz) opt.timeZone = tz; return new Intl.DateTimeFormat(LOC(), opt).format(d); } catch (e) { delete opt.timeZone; return new Intl.DateTimeFormat(LOC(), opt).format(d); } }
+function timeStr(d, tz, big) {
+  var o = { hour: "numeric", minute: "2-digit", hour12: cfg.clock === 1 };
+  if (cfg.clock === 0) o.hourCycle = "h23";
+  var s = fmt(d, o, tz);
+  return big && cfg.clock === 1 ? s.replace(/\s?[AP]\.?M\.?/i, "") : s;
+}
+function localOffset(tz) {
+  try { var d = new Date(); var a = new Date(d.toLocaleString("en-US", { timeZone: tz })); var b = new Date(d.toLocaleString("en-US")); return Math.round((a - b) / 60000); } catch (e) { return 0; }
+}
+function tick() {
+  var d = new Date(), tz = zone();
+  $("time").textContent = timeStr(d, tz, true);
+  var other = tz && localOffset(tz) !== 0;
+  $("date").textContent = fmt(d, { weekday: "long", month: "long", day: "numeric" }, tz) + (other ? "  ·  " + T("{0} time", cfg.place.name) : "");
+  var hr = parseInt(fmt(d, { hour: "numeric", hour12: false, hourCycle: "h23" }, tz), 10);
+  $("qClockT").textContent = cfg.clock === 0 ? T("24-hour") : T("12-hour");
+  var w = $("worlds"); w.innerHTML = "";
+  cfg.worlds.forEach(function (c) {
+    var e = document.createElement("div"); e.className = "wc";
+    e.innerHTML = '<div class="n"></div><div class="t"></div>';
+    e.firstChild.textContent = c.name; e.lastChild.textContent = timeStr(d, c.tz, false); w.appendChild(e);
+  });
+  $("saverTime").textContent = timeStr(d, tz, true);
+  $("saverLine").textContent = fmt(d, { weekday: "long", month: "long", day: "numeric" }, tz) + (wx.temp ? "   ·   " + cfg.place.name + " " + wx.temp + " " + wx.cond : "");
+}
+
+// ---------- weather (Open-Meteo, no key) ----------
+var wx = {};
+function cond(c) { return T(condEn(c)); }
+function condEn(c) {
+  if (c === 0) return "Clear"; if (c <= 2) return "Partly cloudy"; if (c === 3) return "Cloudy"; if (c === 45 || c === 48) return "Fog";
+  if (c >= 51 && c <= 57) return "Drizzle"; if (c >= 61 && c <= 67) return "Rain"; if (c >= 71 && c <= 77) return "Snow";
+  if (c >= 80 && c <= 82) return "Showers"; if (c >= 85 && c <= 86) return "Snow showers"; if (c >= 95) return "Thunderstorm"; return "—";
+}
+function icon(c) {
+  var s = '<g fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round">';
+  if (c === 0) s += '<circle cx="12" cy="12" r="4.5" stroke="#ffd27a"/><path stroke="#ffd27a" d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/>';
+  else if (c <= 3 || c === 45 || c === 48) s += (c <= 2 ? '<circle cx="9" cy="9" r="3.5" stroke="#ffd27a"/>' : '') + '<path d="M7 18h10a4 4 0 0 0 0-8 5 5 0 0 0-9.6 1.5A3.3 3.3 0 0 0 7 18z"/>';
+  else if (c >= 71 && c <= 86 && !(c >= 80 && c <= 82)) s += '<path d="M7 15h10a4 4 0 0 0 0-8 5 5 0 0 0-9.6 1.5A3.3 3.3 0 0 0 7 15z"/><path d="M9 18.5h.01M12 20h.01M15 18.5h.01" stroke-width="2.4"/>';
+  else if (c >= 95) s += '<path d="M7 14h10a4 4 0 0 0 0-8 5 5 0 0 0-9.6 1.5A3.3 3.3 0 0 0 7 14z"/><path stroke="#ffd27a" d="M12 14l-2 4h3l-2 4"/>';
+  else s += '<path d="M7 14h10a4 4 0 0 0 0-8 5 5 0 0 0-9.6 1.5A3.3 3.3 0 0 0 7 14z"/><path stroke="#9fd6ff" d="M9 17l-1 3M13 17l-1 3M17 17l-1 3"/>';
+  return s + "</g>";
+}
+function getJSON(u) { return fetch(u, { cache: "no-store" }).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }); }
+function loadWeather() {
+  var p = cfg.place;
+  $("wxName").textContent = p.name;
+  var u = "https://api.open-meteo.com/v1/forecast?latitude=" + p.lat + "&longitude=" + p.lon +
+    "&current=temperature_2m,apparent_temperature,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min&forecast_days=4&timezone=auto" +
+    (cfg.celsius ? "" : "&temperature_unit=fahrenheit");
+  getJSON(u).then(function (j) {
+    if (j.timezone && j.timezone !== "GMT" && j.timezone !== cfg.place.tz) { cfg.place.tz = j.timezone; save("place"); }
+    var c = j.current, d = j.daily;
+    wx.temp = Math.round(c.temperature_2m) + "°"; wx.cond = cond(c.weather_code);
+    $("wxTemp").textContent = wx.temp;
+    $("wxIcon").innerHTML = icon(c.weather_code);
+    $("wxCond").textContent = wx.cond + "  ·  " + T("Feels {0}", Math.round(c.apparent_temperature) + "°");
+    var h = "";
+    for (var i = 0; i < 3 && i < d.time.length; i++) {
+      var dn = i === 0 ? T("Today") : new Date(d.time[i] + "T12:00:00").toLocaleDateString(LOC(), { weekday: "short" });
+      h += '<div class="day"><span>' + dn + "</span><span>" + cond(d.weather_code[i]) + "</span><span>" + Math.round(d.temperature_2m_max[i]) + "°  " + Math.round(d.temperature_2m_min[i]) + "°</span></div>";
+    }
+    $("wxDays").innerHTML = h;
+    $("wxUpd").textContent = T("Updated {0}", timeStr(new Date(), zone(), false));
+    tick();
+  }).catch(function () { if (!wx.temp) $("wxCond").textContent = T("Weather unavailable"); });
+  $("wxAlert").style.display = "none";
+  if (p.cc === "US") getJSON("https://api.weather.gov/alerts/active?point=" + p.lat.toFixed(4) + "," + p.lon.toFixed(4)).then(function (j) {
+    if (!j.features || !j.features.length) return;
+    var e = j.features[0].properties.event || T("Weather alert");
+    $("wxAlert").innerHTML = "<b></b>"; $("wxAlert").firstChild.textContent = T("ALERT"); $("wxAlert").appendChild(document.createTextNode(e + (j.features.length > 1 ? "  " + T("(+{0} more)", j.features.length - 1) : "")));
+    $("wxAlert").style.display = "block";
+  }).catch(function () {});
+}
+setInterval(loadWeather, 30 * 60 * 1000);
+
+// ---------- where your connection comes from ----------
+function loadNet() {
+  getJSON("https://ipwho.is/?fields=success,city,country_code,connection").then(function (j) {
+    if (!j.success) throw 0;
+    var isp = j.connection && (j.connection.isp || j.connection.org) || "";
+    isp = isp.replace(/\b(AS\d+|inc\.?|llc|ltd\.?|ag|gmbh|corporation|corp\.?|communications?|holdings?|networks?|services|limited)\b/gi, "").replace(/[,.]/g, " ").replace(/\s+/g, " ").trim();
+    if (isp.length > 14) isp = isp.slice(0, 13) + "…";
+    $("netText").textContent = j.city + ", " + j.country_code + (isp ? " · " + isp : "");
+  }).catch(function () { $("netText").textContent = T("Online"); });
+}
+setInterval(loadNet, 10 * 60 * 1000);
+addEventListener("online", loadNet);
+
+// ---------- place search ----------
+var searchFor = "weather";
+function openSearch(kind) {
+  searchFor = kind; $("searchTitle").textContent = kind === "clock" ? T("Add a world clock") : T("Weather location");
+  $("q").value = ""; $("qRes").innerHTML = ""; show("search"); setTimeout(function () { $("q").focus(); }, 50);
+}
+function runSearch() {
+  var q = $("q").value.trim(); if (q.length < 2) return;
+  var name = q, filter = "", i = q.indexOf(",");
+  if (i > 0) { name = q.slice(0, i).trim(); filter = q.slice(i + 1).trim().toLowerCase(); }
+  $("qRes").innerHTML = '<div class="hint"></div>'; $("qRes").firstChild.textContent = T("Searching…");
+  getJSON("https://geocoding-api.open-meteo.com/v1/search?count=10&language=" + LANGS[Math.max(0, lang)] + "&format=json&name=" + encodeURIComponent(name)).then(function (j) {
+    var out = [], jobs = [];
+    (j.results || []).forEach(function (o) {
+      var a1 = o.admin1 || "", co = o.country || "", cc = o.country_code || "";
+      if (filter && !(a1.toLowerCase().indexOf(filter) >= 0 || co.toLowerCase().indexOf(filter) >= 0 || cc.toLowerCase() === filter)) return;
+      if ((o.feature_code || "").indexOf("PCL") === 0) {
+        jobs.push(getJSON("https://restcountries.com/v3.1/alpha/" + cc + "?fields=capital,capitalInfo").then(function (r) {
+          r = Array.isArray(r) ? r[0] : r;
+          out.unshift({ label: r.capital[0] + ", " + co + " " + T("(capital)"), name: r.capital[0], lat: r.capitalInfo.latlng[0], lon: r.capitalInfo.latlng[1], cc: cc, tz: "" });
+        }).catch(function () { out.push({ label: o.name + " " + T("(center)"), name: o.name, lat: o.latitude, lon: o.longitude, cc: cc, tz: o.timezone || "" }); }));
+        return;
+      }
+      var lab = o.name + (a1 && a1 !== o.name ? ", " + a1 : "") + (co && co !== o.name ? ", " + co : "");
+      out.push({ label: lab, name: o.name, lat: o.latitude, lon: o.longitude, cc: cc, tz: o.timezone || "" });
+    });
+    Promise.all(jobs).then(function () {
+      var r = $("qRes"); r.innerHTML = "";
+      if (!out.length) { r.innerHTML = '<div class="hint"></div>'; r.firstChild.textContent = T("No place found. Try another spelling."); return; }
+      out.slice(0, 7).forEach(function (pl) {
+        var b = document.createElement("button"); b.className = "row focusable"; b.innerHTML = "<span></span><span></span>"; b.firstChild.textContent = pl.label; b.lastChild.textContent = T("Pick");
+        b.onclick = function () { pickPlace(pl); }; r.appendChild(b);
+      });
+      r.firstChild.focus();
+    });
+  }).catch(function () { $("qRes").innerHTML = '<div class="hint"></div>'; $("qRes").firstChild.textContent = T("Search failed. Check the connection and try again."); });
+}
+function tzFor(pl) {
+  if (pl.tz) return Promise.resolve(pl.tz);
+  return getJSON("https://api.open-meteo.com/v1/forecast?latitude=" + pl.lat + "&longitude=" + pl.lon + "&current=temperature_2m&timezone=auto").then(function (j) { return j.timezone || ""; }).catch(function () { return ""; });
+}
+function pickPlace(pl) {
+  tzFor(pl).then(function (tz) {
+    pl.tz = tz;
+    if (searchFor === "clock") {
+      if (!tz) { flash(T("Couldn't find the time zone for {0}", pl.name)); return; }
+      if (cfg.worlds.length >= 3) cfg.worlds.shift();
+      cfg.worlds.push({ name: pl.name.length > 12 ? pl.name.slice(0, 11) + "…" : pl.name, tz: tz }); save("worlds");
+      flash(T("Clock added: {0}", pl.name));
+    } else {
+      cfg.place = { name: pl.name, lat: pl.lat, lon: pl.lon, cc: pl.cc, tz: tz }; save("place");
+      wx = {}; $("wxTemp").textContent = "--°"; $("wxCond").textContent = T("Loading weather…"); loadWeather();
+      flash(T("Weather: {0}", pl.name));
+    }
+    hide("search"); tick(); renderSettings();
+  });
+}
+
+// ---------- your sites ----------
+function host(u) { try { return new URL(u).hostname.replace(/^www\./, ""); } catch (e) { return u; } }
+var selIdx = 0, recent = store.get(pk("recent"), []);
+function iconEl(l, cls) {
+  var w = document.createElement("div"); w.className = cls || "";
+  var img = document.createElement("img"); img.alt = "";
+  img.src = "https://www.google.com/s2/favicons?sz=128&domain=" + encodeURIComponent(host(l.u));
+  img.onerror = function () { var s = document.createElement("div"); s.className = "letter"; s.textContent = (l.n || "?").charAt(0).toUpperCase(); img.replaceWith(s); };
+  return img;
+}
+function openSite(l) {
+  recent = recent.filter(function (u) { return u !== l.u; }); recent.unshift(l.u); recent = recent.slice(0, 6); store.set(pk("recent"), recent);
+  location.href = l.u;
+}
+function select(i) {
+  selIdx = i; var l = cfg.links[i]; if (!l) { $("selName").textContent = T("Add your sites"); $("selSub").textContent = T("Press Edit sites to add YouTube, Netflix and more"); $("selIcon").innerHTML = ""; return; }
+  $("selName").textContent = l.n; $("selSub").textContent = host(l.u);
+  $("selIcon").innerHTML = ""; $("selIcon").appendChild(iconEl(l));
+}
+function renderLinks() {
+  var L = $("links"); L.innerHTML = "";
+  cfg.links.slice(0, 8).forEach(function (l, i) {
+    var a = document.createElement("a"); a.className = "tile focusable"; a.href = l.u; a.rel = "noopener";
+    a.innerHTML = '<div class="box glass"></div><div class="lab"></div>';
+    a.firstChild.appendChild(iconEl(l)); a.lastChild.textContent = l.n;
+    a.addEventListener("focus", function () { select(i); });
+    a.addEventListener("mouseenter", function () { select(i); });
+    a.onclick = function (e) { e.preventDefault(); openSite(l); };
+    L.appendChild(a);
+  });
+  var R = $("recent"); R.innerHTML = "";
+  recent.forEach(function (u) {
+    var l = null; cfg.links.forEach(function (x) { if (x.u === u) l = x; }); if (!l) return;
+    var b = document.createElement("button"); b.className = "rt glass dark focusable"; b.title = l.n; b.appendChild(iconEl(l));
+    b.addEventListener("focus", function () { $("selName").textContent = l.n; $("selSub").textContent = host(l.u); });
+    b.onclick = function () { openSite(l); }; R.appendChild(b);
+  });
+  $("recentT").style.display = R.children.length ? "block" : "none";
+  select(Math.min(selIdx, Math.max(0, cfg.links.length - 1)));
+}
+$("openBtn").onclick = function () { var l = cfg.links[selIdx]; if (l) openSite(l); else openLinkEd(); };
+$("allBtn").onclick = function () { openLinkEd(); };
+$("navHome").onclick = function () { var f = document.querySelector("#links .tile"); if (f) f.focus(); };
+$("navSites").onclick = function () { openLinkEd(); };
+$("navWx").onclick = function () { openSearch("weather"); };
+$("navPhotos").onclick = function () { $("hide").click(); };
+$("qBg").onclick = function () { var order = SCENES.map(function (s, i) { return i; }).concat([99]); if (photos.length) order.push(98);
+  var k = order.indexOf(cfg.scene); cfg.scene = order[(k + 1) % order.length]; save("scene"); applyBackground();
+  flash("Background: " + (cfg.scene === 99 ? "Rotate" : cfg.scene === 98 ? "Your photos" : SCENES[cfg.scene])); };
+$("qSaver").onclick = function () { saving = true; $("saver").style.display = "block"; driftSaver(); };
+$("qClock").onclick = function () { cfg.clock = 1 - cfg.clock; save("clock"); tick(); };
+$("qAccent").onclick = function () { cfg.accent = (cfg.accent + 1) % ACCENTS.length; save("accent"); applyAccent(); flash(T("Accent: {0}", T(ACCENTS[cfg.accent][0]))); };
+$("qApp").onclick = function () { flash(T("Google TV, Android TV, Fire TV: install Downloader, enter {0}", "3985133")); };
+function openLinkEd() {
+  var L = $("linkList"); L.innerHTML = "";
+  cfg.links.forEach(function (l, i) {
+    var b = document.createElement("button"); b.className = "row focusable"; b.innerHTML = "<span></span><span></span>"; b.firstChild.textContent = l.n + "  ·  " + host(l.u); b.lastChild.textContent = T("Remove");
+    b.onclick = function () { cfg.links.splice(i, 1); save("links"); renderLinks(); openLinkEd(); }; L.appendChild(b);
+  });
+  if (!cfg.links.length) { L.innerHTML = '<div class="hint"></div>'; L.firstChild.textContent = T("No sites yet."); }
+  show("linkEd");
+}
+$("lAdd").onclick = function () {
+  var n = $("lName").value.trim(), u = $("lUrl").value.trim();
+  if (!u) { $("lUrl").focus(); return; }
+  if (!/^https?:\/\//i.test(u)) u = "https://" + u;
+  if (cfg.links.length >= 8) { flash(T("You have 8 sites. Remove one first.")); return; }
+  cfg.links.push({ n: n || host(u), u: u }); save("links"); $("lName").value = ""; $("lUrl").value = ""; renderLinks(); openLinkEd();
+};
+$("lDone").onclick = function () { hide("linkEd"); };
+
+// ---------- settings ----------
+function renderSettings() {
+  var rows = [
+    [T("Language"), LANG_NAMES[Math.max(0, lang)], function () { hide("settings"); openLang(); }],
+    [T("Profiles"), profName(curProf()) + " · " + T("{0} on this browser", profiles.length), function () { hide("settings"); manageProfiles(); }],
+    [T("Weather location"), T("{0} — OK to change", cfg.place.name), function () { openSearch("weather"); }],
+    [T("Temperature"), cfg.celsius ? "°C" : "°F", function () { cfg.celsius = !cfg.celsius; save("celsius"); loadWeather(); }],
+    [T("Clock format"), cfg.clock === 0 ? T("24-hour") : T("12-hour"), function () { cfg.clock = 1 - cfg.clock; save("clock"); tick(); }],
+    [T("Clock time zone"), cfg.tzPlace ? T("Weather location") + " (" + (cfg.place.tz || "…").replace(/_/g, " ") + ")" : T("This device's time"), function () { cfg.tzPlace = !cfg.tzPlace; save("tzPlace"); tick(); }],
+    [T("World clocks"), cfg.worlds.length ? T("{0} — OK to add", cfg.worlds.map(function (w) { return w.name; }).join(", ")) : T("None — OK to add"), function () { openSearch("clock"); }],
+    [T("Remove world clocks"), cfg.worlds.length ? T("OK to clear all") : "—", function () { cfg.worlds = []; save("worlds"); tick(); }],
+    [T("Sports teams"), cfg.teams.length ? cfg.teams.map(function (t) { return t.ab; }).join(", ") : T("None — OK to add"), function () { hide("settings"); manageTeams(); }],
+    [T("Background"), cfg.scene === 99 ? T("Rotate every 15 min") : cfg.scene === 98 ? T("Your photos") + " (" + photos.length + ")" : T(SCENES[cfg.scene]), function () {
+      var order = SCENES.map(function (s, i) { return i; }).concat([99]); if (photos.length) order.push(98);
+      var k = order.indexOf(cfg.scene); cfg.scene = order[(k + 1) % order.length]; save("scene"); applyBackground(); }],
+    [T("Add your photos"), T("This browser only — OK to pick"), function () { $("hide").click(); }],
+    [T("Remove your photos"), photos.length ? T("{0} saved — OK to remove", photos.length) : T("None saved"), function () { clearPhotos(); }],
+    [T("News headlines"), cfg.news ? T("Top stories") : T("Off"), function () { cfg.news = !cfg.news; save("news"); loadNews(true); }],
+    [T("Accent color"), T(ACCENTS[cfg.accent][0]), function () { cfg.accent = (cfg.accent + 1) % ACCENTS.length; save("accent"); applyAccent(); }],
+    [T("Screensaver after"), cfg.saverMin ? T("{0} minutes", cfg.saverMin) : T("Off"), function () { var o = [0, 2, 5, 10, 30]; cfg.saverMin = o[(o.indexOf(cfg.saverMin) + 1) % o.length]; save("saverMin"); }],
+    [T("Your sites"), T("{0} sites — OK to edit", cfg.links.length), function () { hide("settings"); openLinkEd(); }],
+    [T("Send to another device"), T("QR code or link with your setup"), function () { hide("settings"); openShare(); }],
+    [T("Get the TV app"), T("Google TV / Android TV / Fire TV: Downloader code {0}", "3985133"), function () { flash(T("On your TV: install Downloader, enter {0}", "3985133")); }]
+  ];
+  var R = $("setRows"), focused = document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.i : null;
+  R.innerHTML = "";
+  rows.forEach(function (r, i) {
+    var b = document.createElement("button"); b.className = "row focusable"; b.dataset.i = i;
+    b.innerHTML = "<span></span><span></span>"; b.firstChild.textContent = r[0]; b.lastChild.textContent = r[1];
+    b.onclick = function () { r[2](); renderSettings(); }; R.appendChild(b);
+  });
+  if (focused !== null && $("settings").style.display === "block") { var f = R.querySelector('[data-i="' + focused + '"]'); if (f) f.focus(); }
+}
+function applyAccent() { document.documentElement.style.setProperty("--accent", ACCENTS[cfg.accent][1]); }
+$("hide").onchange = function () { addPhotos(this.files); this.value = ""; };
+
+// ---------- overlays, messages ----------
+var stack = [];
+function show(id) { $(id).style.display = "block"; stack.push(id); var f = $(id).querySelector(".focusable, input"); if (f) f.focus(); }
+function hide(id) { $(id).style.display = "none"; stack = stack.filter(function (x) { return x !== id; }); var b = stack.length ? $(stack[stack.length - 1]).querySelector(".focusable") : $("setBtn"); if (b) b.focus(); }
+var msgT = 0;
+function flash(t) { var m = $("msg"); m.textContent = t; m.style.display = "block"; clearTimeout(msgT); msgT = setTimeout(function () { m.style.display = "none"; }, 4000); }
+$("setBtn").onclick = function () { renderSettings(); show("settings"); };
+$("wx").onclick = function () { openSearch("weather"); };
+$("qGo").onclick = runSearch; $("qCancel").onclick = function () { hide("search"); };
+$("q").addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); runSearch(); } });
+$("fsBtn").onclick = function () {
+  var d = document, el = d.documentElement;
+  try { if (d.fullscreenElement || d.webkitFullscreenElement) (d.exitFullscreen || d.webkitExitFullscreen).call(d); else (el.requestFullscreen || el.webkitRequestFullscreen).call(el); }
+  catch (e) { flash(T("Full screen isn't available in this browser")); }
+};
+$("netPill").onclick = function () { $("netText").textContent = T("Checking…"); loadNet(); };
+
+// ---------- remote control: arrows move focus to the nearest item that way ----------
+function visible(el) { if (!el.offsetParent && el.tagName !== "BODY") return false; var r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; }
+function candidates() {
+  var root = stack.length ? $(stack[stack.length - 1]) : document;
+  return Array.prototype.filter.call(root.querySelectorAll(".focusable, input"), function (e) {
+    if (!visible(e)) return false; if (!stack.length && e.closest(".overlay")) return false; return true;
+  });
+}
+function move(dir) {
+  var cur = document.activeElement, list = candidates();
+  if (!cur || list.indexOf(cur) < 0) { if (list[0]) list[0].focus(); return; }
+  var a = cur.getBoundingClientRect(), ax = a.left + a.width / 2, ay = a.top + a.height / 2, best = null, bd = 1e9;
+  list.forEach(function (e) {
+    if (e === cur) return; var b = e.getBoundingClientRect(), bx = b.left + b.width / 2, by = b.top + b.height / 2, dx = bx - ax, dy = by - ay;
+    var ok = dir === "L" ? dx < -4 : dir === "R" ? dx > 4 : dir === "U" ? dy < -4 : dy > 4; if (!ok) return;
+    var main = dir === "L" || dir === "R" ? Math.abs(dx) : Math.abs(dy), side = dir === "L" || dir === "R" ? Math.abs(dy) : Math.abs(dx);
+    var d = main + side * 2.2; if (d < bd) { bd = d; best = e; }
+  });
+  if (best) { best.focus(); if (best.scrollIntoView) best.scrollIntoView({ block: "nearest" }); }
+}
+var KEYMAP = { 37: "L", 38: "U", 39: "R", 40: "D" };
+var BACK = { 8: 1, 27: 1, 461: 1, 10009: 1 };   // Backspace, Esc, LG webOS Back, Samsung Tizen Back
+document.addEventListener("keydown", function (e) {
+  wake();
+  var typing = document.activeElement && document.activeElement.tagName === "INPUT";
+  if (KEYMAP[e.keyCode] && !(typing && (e.keyCode === 37 || e.keyCode === 39))) { e.preventDefault(); move(KEYMAP[e.keyCode]); return; }
+  if (BACK[e.keyCode] && !(typing && e.keyCode === 8)) {
+    if (stack.length) { e.preventDefault(); var top = stack[stack.length - 1]; if (top === "langO" && lang < 0) return; hide(top); }
+    return;
+  }
+  if (e.keyCode === 13 && document.activeElement && document.activeElement.tagName === "DIV") { e.preventDefault(); document.activeElement.click(); }
+});
+try { if (window.tizen && tizen.tvinputdevice) tizen.tvinputdevice.registerKey("Return"); } catch (e) {}
+
+// ---------- screensaver ----------
+var idleAt = Date.now(), saving = false;
+function wake() { idleAt = Date.now(); if (saving) { saving = false; $("saver").style.display = "none"; } }
+["mousemove", "mousedown", "touchstart", "wheel"].forEach(function (ev) { addEventListener(ev, wake, { passive: true }); });
+setInterval(function () {
+  if (!saving && cfg.saverMin && !stack.length && Date.now() - idleAt > cfg.saverMin * 60000) { saving = true; $("saver").style.display = "block"; driftSaver(); }
+  if (saving && Math.floor(Date.now() / 1000) % 40 === 0) driftSaver();
+}, 1000);
+function driftSaver() { var b = $("saverBox"); b.style.left = (80 + Math.random() * 900) + "px"; b.style.top = (80 + Math.random() * 560) + "px"; if (cfg.scene === 98 && photos.length > 1) { photoIdx++; showPhoto(); } }
+
+// ---------- move your setup between the TV app and other browsers ----------
+function buildShare() {
+  var keys = []; cfg.links.forEach(function (l) { var k = keyForUrl(l.u); if (k && keys.indexOf(k) < 0) keys.push(k); });
+  var clean = function (x) { return String(x).replace(/[~|;]/g, " "); };
+  var p = cfg.place, place = [clean(p.name), (+p.lat).toFixed(3), (+p.lon).toFixed(3), p.cc || "", p.tz || ""].join("~");
+  var cl = cfg.worlds.map(function (w) { return clean(w.name) + "~" + w.tz; }).join("|");
+  var flags = "c" + cfg.clock + "a" + cfg.accent + "f" + (cfg.celsius ? 1 : 0) + "z" + (cfg.tzPlace ? 1 : 0) + (lang >= 0 ? "l" + lang + "x" : "");
+  var tm = cfg.teams.map(function (t) { return [t.s, t.l, t.id, clean(t.ab), clean(t.n)].join("~"); }).join("|");
+  return WEB_URL + "#s=1;" + encodeURIComponent(keys.join(".")) + ";" + encodeURIComponent(place) + ";" + encodeURIComponent(cl) + ";" + flags + (tm ? ";" + encodeURIComponent(tm) : "");
+}
+function importSetup() {
+  var h = location.hash; if (h.indexOf("#s=1;") !== 0) return;
+  try {
+    var m, parts = h.slice(5).split(";"), apps = decodeURIComponent(parts[0] || ""), place = decodeURIComponent(parts[1] || ""), cl = decodeURIComponent(parts[2] || ""), fl = parts[3] || "";
+    var added = 0, tAdded = 0, tm = decodeURIComponent(parts[4] || "");
+    if (tm) { var tl = tm.split("|").map(function (x) { var a = x.split("~"); return { s: a[0], l: a[1], id: a[2], ab: a[3], n: a[4] }; }).filter(function (t) { return t.id && t.n; }).slice(0, 5);
+      if (tl.length) { cfg.teams = tl; save("teams"); tAdded = tl.length; } }
+    if ((m = /l(\d+)x/.exec(fl)) && +m[1] < LANGS.length) { lang = +m[1]; store.set("lang", lang); }
+    if (apps) {
+      var list = [];
+      apps.split(".").forEach(function (k) { if (WEB_SITES[k]) { list.push({ n: WEB_SITES[k].n, u: WEB_SITES[k].u }); added++; } });
+      cfg.links.forEach(function (l) { if (list.length < 8 && !list.some(function (x) { return host(x.u) === host(l.u); })) list.push(l); });
+      if (list.length) { cfg.links = list.slice(0, 8); save("links"); }
+    }
+    if (place) { var q = place.split("~"); if (q.length >= 3 && !isNaN(+q[1])) { cfg.place = { name: q[0], lat: +q[1], lon: +q[2], cc: q[3] || "", tz: q[4] || "" }; save("place"); } }
+    cfg.worlds = cl ? cl.split("|").map(function (x) { var a = x.split("~"); return { name: a[0], tz: a[1] }; }).filter(function (w) { return w.tz; }).slice(0, 3) : []; save("worlds");
+    if ((m = /c(\d)/.exec(fl))) { cfg.clock = +m[1] ? 1 : 0; save("clock"); }
+    if ((m = /a(\d)/.exec(fl))) { cfg.accent = Math.min(ACCENTS.length - 1, +m[1]); save("accent"); }
+    if ((m = /f(\d)/.exec(fl))) { cfg.celsius = m[1] === "1"; save("celsius"); }
+    if ((m = /z(\d)/.exec(fl))) { cfg.tzPlace = m[1] === "1"; save("tzPlace"); }
+    try { history.replaceState(null, "", location.pathname + location.search); } catch (e) {}
+    setTimeout(function () { flash(T("Your setup is here: {0} apps as websites, {1} weather", added, cfg.place.name) + (cfg.worlds.length ? ", " + T("{0} world clocks", cfg.worlds.length) : "") + (tAdded ? ", " + T("{0} teams", tAdded) : "")); }, 600);
+  } catch (e) { flash(T("That setup link didn't work. Make a new one on the TV.")); }
+}
+function openShare() {
+  var url = buildShare(), q = QR.encode(url), cv = $("shareQr"), g = cv.getContext("2d");
+  g.fillStyle = "#fff"; g.fillRect(0, 0, 460, 460);
+  if (q) { var cell = Math.floor(420 / q.size), off = Math.floor((460 - cell * q.size) / 2); g.fillStyle = "#0b0d1a";
+    for (var y = 0; y < q.size; y++) for (var x = 0; x < q.size; x++) if (q.mod[y][x]) g.fillRect(off + x * cell, off + y * cell, cell, cell); }
+  $("shareLink").textContent = url; $("shareLink").dataset.url = url;
+  $("shShare").style.display = navigator.share ? "" : "none";
+  show("share");
+}
+$("shCopy").onclick = function () {
+  var u = $("shareLink").dataset.url;
+  var done = function () { flash(T("Link copied. Paste it into any browser.")); };
+  try { navigator.clipboard.writeText(u).then(done, function () { fallbackCopy(u); done(); }); } catch (e) { fallbackCopy(u); done(); }
+};
+function fallbackCopy(u) { var t = document.createElement("textarea"); t.value = u; document.body.appendChild(t); t.select(); try { document.execCommand("copy"); } catch (e) {} t.remove(); }
+$("shShare").onclick = function () { try { navigator.share({ title: "My WLH Glass", url: $("shareLink").dataset.url }); } catch (e) {} };
+$("shDone").onclick = function () { hide("share"); };
+
+// ---------- generic list and text prompt ----------
+function pick(title, hint, items) {
+  $("pickTitle").textContent = title; $("pickHint").textContent = hint || "";
+  var R = $("pickRows"); R.innerHTML = "";
+  items.forEach(function (it) {
+    var b = document.createElement("button"); b.className = "row focusable"; b.innerHTML = "<span></span><span></span>";
+    b.firstChild.textContent = it.t; b.lastChild.textContent = it.sub || "";
+    b.onclick = function () { hide("pick"); it.fn(); }; R.appendChild(b);
+  });
+  if ($("pick").style.display === "block") hide("pick");
+  show("pick");
+}
+var askCb = null;
+function ask(title, value, cb) {
+  $("askTitle").textContent = title; $("askIn").value = value || ""; askCb = cb; show("ask");
+  setTimeout(function () { $("askIn").focus(); $("askIn").select(); }, 50);
+}
+$("askOk").onclick = function () { var v = $("askIn").value.trim(); hide("ask"); if (v && askCb) askCb(v.slice(0, 20)); };
+$("askNo").onclick = function () { hide("ask"); };
+$("askIn").addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); $("askOk").click(); } });
+
+// ---------- language picker (first start and Settings) ----------
+function openLang() {
+  var G = $("langGrid"); G.innerHTML = "";
+  LANG_NAMES.forEach(function (n, i) {
+    var b = document.createElement("button"); b.className = "row focusable" + (i === lang ? " cur" : ""); b.textContent = n; b.lang = LANGS[i];
+    b.onclick = function () { setLang(i); hide("langO"); }; G.appendChild(b);
+  });
+  show("langO");
+  var c = G.children[Math.max(0, lang)]; if (c) c.focus();
+}
+function setLang(i) {
+  lang = i; store.set("lang", i); applyLang(); loadNews(true); renderProf(); renderLinks(); renderGames(); tick(); loadWeather();
+}
+
+// ---------- profiles ----------
+function renderProf() { $("profName").textContent = profName(curProf()); $("profPill").style.display = profiles.length > 1 ? "" : "none"; }
+function saveProfiles() { store.set("profiles", profiles); store.set("nextProf", nextProf); }
+function switchProfile(id) {
+  profId = id; store.set("prof", id);
+  cfg.links = store.get(pk("links"), DEFAULT_LINKS); cfg.accent = store.get(pk("accent"), 0); cfg.scene = store.get(pk("scene"), 0); cfg.teams = store.get(pk("teams"), []);
+  recent = store.get(pk("recent"), []); selIdx = 0; games = []; gamesAt = 0;
+  applyAccent(); applyBackground(); renderLinks(); renderProf(); loadGames(true);
+  flash(T("Profile: {0}", profName(curProf())));
+  setTimeout(function () { var f = document.querySelector("#links .tile"); if (f) f.focus(); }, 50);
+}
+function manageProfiles() {
+  var cur = curProf(), items = profiles.map(function (p) {
+    return { t: (p.id === profId ? "✓  " : "     ") + profName(p), sub: p.id === profId ? T("Current") : T("Switch"), fn: function () { if (p.id !== profId) switchProfile(p.id); } };
+  });
+  if (profiles.length < 6) items.push({ t: "+  " + T("Add a profile"), sub: "", fn: function () {
+    ask(T("Profile name"), "", function (n) { var id = nextProf++; profiles.push({ id: id, n: n }); saveProfiles(); switchProfile(id); }); } });
+  items.push({ t: T("Rename {0}", profName(cur)), sub: "", fn: function () {
+    ask(T("Profile name"), profName(cur), function (n) { cur.n = n; saveProfiles(); renderProf(); }); } });
+  if (cur.id !== 0) items.push({ t: T("Remove {0}", profName(cur)), sub: T("Its sites and teams are deleted"), fn: function () {
+    var id = cur.id;
+    try { var pre = "wlhg.p" + id + ".", ks = []; for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); if (k.indexOf(pre) === 0) ks.push(k); } ks.forEach(function (k) { localStorage.removeItem(k); }); } catch (e) {}
+    profiles = profiles.filter(function (p) { return p.id !== id; }); saveProfiles(); switchProfile(0); } });
+  pick(T("Profiles"), T("Each profile keeps its own sites, accent color, background and teams."), items);
+}
+$("profPill").onclick = manageProfiles;
+
+// ---------- sports: up to 5 teams, scores from ESPN (same source as the TV app) ----------
+var ESPN = "https://site.api.espn.com/apis/site/v2/sports/";
+var LEAGUES = [["NFL","football","nfl",0],["NBA","basketball","nba",0],["MLB","baseball","mlb",0],["NHL","hockey","nhl",0],["WNBA","basketball","wnba",0],["College football","football","college-football",0],["College basketball","basketball","mens-college-basketball",0],["World Cup (FIFA)","soccer","fifa.world",1],["Club World Cup","soccer","fifa.cwc",1],["Champions League","soccer","uefa.champions",1],["Europa League","soccer","uefa.europa",1],["Conference League","soccer","uefa.europa.conf",1],["UEFA Nations League","soccer","uefa.nations",1],["Euro (European Championship)","soccer","uefa.euro",1],["Women's Champions League","soccer","uefa.wchampions",1],["Copa América","soccer","conmebol.america",1],["Copa Libertadores","soccer","conmebol.libertadores",1],["Copa Sudamericana","soccer","conmebol.sudamericana",1],["CONCACAF Champions Cup","soccer","concacaf.champions",1],["Gold Cup","soccer","concacaf.gold",1],["Africa Cup of Nations","soccer","caf.nations",1],["AFC Asian Cup","soccer","afc.asian.cup",1],["AFC Champions League","soccer","afc.champions",1],["England Premier League","soccer","eng.1",2],["England Championship","soccer","eng.2",2],["England League One","soccer","eng.3",2],["England League Two","soccer","eng.4",2],["England FA Cup","soccer","eng.fa",2],["England League Cup","soccer","eng.league_cup",2],["England Women's Super League","soccer","eng.w.1",2],["Scotland Premiership","soccer","sco.1",2],["Scotland Championship","soccer","sco.2",2],["Wales Premier League","soccer","wal.1",2],["Northern Ireland Premiership","soccer","nir.1",2],["Ireland Premier Division","soccer","irl.1",2],["Spain La Liga","soccer","esp.1",2],["Spain Segunda","soccer","esp.2",2],["Spain Copa del Rey","soccer","esp.copa_del_rey",2],["Spain Liga F (women)","soccer","esp.w.1",2],["Germany Bundesliga","soccer","ger.1",2],["Germany 2. Bundesliga","soccer","ger.2",2],["Germany 3. Liga","soccer","ger.3",2],["Germany DFB-Pokal","soccer","ger.dfb_pokal",2],["Italy Serie A","soccer","ita.1",2],["Italy Serie B","soccer","ita.2",2],["Italy Coppa Italia","soccer","ita.coppa_italia",2],["France Ligue 1","soccer","fra.1",2],["France Ligue 2","soccer","fra.2",2],["France Coupe de France","soccer","fra.coupe_de_france",2],["Netherlands Eredivisie","soccer","ned.1",2],["Netherlands Eerste Divisie","soccer","ned.2",2],["Portugal Primeira Liga","soccer","por.1",2],["Portugal Liga 2","soccer","por.2",2],["Belgium Pro League","soccer","bel.1",2],["Switzerland Super League","soccer","sui.1",2],["Austria Bundesliga","soccer","aut.1",2],["Turkey Süper Lig","soccer","tur.1",2],["Greece Super League","soccer","gre.1",2],["Denmark Superliga","soccer","den.1",2],["Norway Eliteserien","soccer","nor.1",2],["Sweden Allsvenskan","soccer","swe.1",2],["Finland Veikkausliiga","soccer","fin.1",2],["Iceland Besta deild","soccer","isl.1",2],["Poland Ekstraklasa","soccer","pol.1",2],["Czech First League","soccer","cze.1",2],["Slovakia Super Liga","soccer","svk.1",2],["Hungary NB I","soccer","hun.1",2],["Romania Liga I","soccer","rou.1",2],["Bulgaria First League","soccer","bul.1",2],["Croatia HNL","soccer","cro.1",2],["Serbia SuperLiga","soccer","srb.1",2],["Slovenia PrvaLiga","soccer","svn.1",2],["Ukraine Premier League","soccer","ukr.1",2],["Russia Premier League","soccer","rus.1",2],["Cyprus First Division","soccer","cyp.1",2],["Israel Premier League","soccer","isr.1",2],["USA MLS","soccer","usa.1",3],["USA NWSL","soccer","usa.nwsl",3],["USA USL Championship","soccer","usa.usl.1",3],["USA Open Cup","soccer","usa.open",3],["Mexico Liga MX","soccer","mex.1",3],["Mexico Liga de Expansión","soccer","mex.2",3],["Canada Premier League","soccer","can.1",3],["Costa Rica Primera","soccer","crc.1",3],["Honduras Liga Nacional","soccer","hon.1",3],["Guatemala Liga Nacional","soccer","gua.1",3],["El Salvador Primera","soccer","slv.1",3],["Panama LPF","soccer","pan.1",3],["Jamaica Premier League","soccer","jam.1",3],["Brazil Série A","soccer","bra.1",3],["Brazil Série B","soccer","bra.2",3],["Brazil Copa do Brasil","soccer","bra.copa_do_brazil",3],["Argentina Liga Profesional","soccer","arg.1",3],["Argentina Copa","soccer","arg.copa",3],["Colombia Liga BetPlay","soccer","col.1",3],["Colombia Primera B","soccer","col.2",3],["Chile Primera","soccer","chi.1",3],["Peru Liga 1","soccer","per.1",3],["Uruguay Primera","soccer","uru.1",3],["Paraguay Primera","soccer","par.1",3],["Ecuador LigaPro","soccer","ecu.1",3],["Venezuela Primera","soccer","ven.1",3],["Bolivia División Profesional","soccer","bol.1",3],["Japan J1 League","soccer","jpn.1",4],["South Korea K League 1","soccer","kor.1",4],["China Super League","soccer","chn.1",4],["Saudi Pro League","soccer","ksa.1",4],["UAE Pro League","soccer","uae.1",4],["Qatar Stars League","soccer","qat.1",4],["India Super League","soccer","ind.1",4],["Thailand League 1","soccer","tha.1",4],["Indonesia Liga 1","soccer","idn.1",4],["Malaysia Super League","soccer","mys.1",4],["Australia A-League","soccer","aus.1",4],["Australia A-League Women","soccer","aus.w.1",4],["South Africa Premiership","soccer","rsa.1",4],["Nigeria Premier League","soccer","nga.1",4],["Egypt Premier League","soccer","egy.1",4],["Morocco Botola","soccer","mar.1",4],["Ghana Premier League","soccer","gha.1",4],["Kenya Premier League","soccer","ken.1",4]];
+var LEAGUE_GROUPS = ["US sports", "Soccer · International", "Soccer · Europe", "Soccer · Americas", "Soccer · Asia, Africa & Oceania"];
+var games = [], gamesAt = 0, gamesLive = false, gamesBusy = false;
+function whenStr(iso, long) {
+  var d = new Date(iso); if (isNaN(d)) return "";
+  var o = long ? { weekday: "short", day: "numeric", month: "short" } : { weekday: "short" };
+  return fmt(d, o, zone()) + "  " + timeStr(d, zone(), false);
+}
+function scoreOf(c) { var s = c.score; return s && typeof s === "object" ? (s.displayValue || "") : s == null ? "" : String(s); }
+function manageTeams() {
+  var items = cfg.teams.map(function (t, i) { return { t: t.n, sub: T("Remove"), fn: function () { cfg.teams.splice(i, 1); save("teams"); loadGames(true); manageTeams(); } }; });
+  if (cfg.teams.length < 5) items.push({ t: "+  " + T("Add a team"), sub: "", fn: pickGroup });
+  pick(T("Sports teams"), T("Up to 5 teams. Scores show under the menu; OK on them opens the scoreboard."), items);
+}
+function pickGroup() {
+  pick(T("Pick a league"), "", LEAGUE_GROUPS.map(function (g, gi) { return { t: T(g), sub: "", fn: function () { pickLeague(gi); } }; }));
+}
+function pickLeague(gi) {
+  var items = []; LEAGUES.forEach(function (L, i) { if (L[3] === gi) items.push({ t: L[0], sub: "", fn: function () { loadTeams(i); } }); });
+  pick(T(LEAGUE_GROUPS[gi]), "", items);
+}
+function loadTeams(i) {
+  var L = LEAGUES[i]; flash(T("Loading teams…"));
+  getJSON(ESPN + L[1] + "/" + L[2] + "/teams?limit=500").then(function (j) {
+    var out = j.sports[0].leagues[0].teams.map(function (x) { var t = x.team; return { s: L[1], l: L[2], id: String(t.id), ab: t.abbreviation || "?", n: t.displayName || "?" }; });
+    out.sort(function (a, b) { return a.n.localeCompare(b.n); });
+    if (!out.length) throw 0;
+    pick(T("Pick your team"), L[0], out.map(function (t) { return { t: t.n, sub: t.ab, fn: function () {
+      if (cfg.teams.some(function (x) { return x.id === t.id && x.l === t.l; })) { flash(T("Already added")); return; }
+      cfg.teams.push(t); save("teams"); loadGames(true); flash(T("Added ") + t.n); } }; }));
+  }).catch(function () { flash(T("Couldn't load teams. Try again.")); });
+}
+function loadGames(force) {
+  if (!cfg.teams.length) { games = []; renderGames(); return; }
+  var age = Date.now() - gamesAt;
+  if (gamesBusy || (!force && age < (gamesLive ? 2 : 30) * 60000)) return;
+  gamesBusy = true; var tl = cfg.teams.slice(), live = false; renderGames();
+  Promise.all(tl.map(function (t) {
+    return getJSON(ESPN + t.s + "/" + t.l + "/teams/" + t.id).then(function (j) {
+      var ne = j.team && j.team.nextEvent;
+      if (!ne || !ne.length) return [t.ab, T("No game scheduled"), false];
+      var ev = ne[0], comp = ev.competitions[0], st = (comp.status || ev.status || {}).type || {}, state = st.state || "pre";
+      var home = "", away = "", hs = "", as = "";
+      comp.competitors.forEach(function (c) { var ab = (c.team && c.team.abbreviation) || "?"; if (c.homeAway === "home") { home = ab; hs = scoreOf(c); } else { away = ab; as = scoreOf(c); } });
+      if (state === "pre") return [away + " @ " + home, whenStr(ev.date, false), false];
+      if (state === "in") live = true;
+      return [away + " " + as + "  " + home + " " + hs, st.shortDetail || "", state === "in"];
+    }).catch(function () { return [t.ab, T("Scores unavailable"), false]; });
+  })).then(function (rows) { games = rows; gamesAt = Date.now(); gamesLive = live; gamesBusy = false; renderGames(); });
+}
+function renderGames() {
+  var G = $("games"); if (!cfg.teams.length) { G.style.display = "none"; return; }
+  G.style.display = "block";
+  var R = $("gRows"); R.innerHTML = "";
+  if (!games.length) { R.innerHTML = '<div class="gr"><span></span></div>'; R.firstChild.firstChild.textContent = T("Loading…"); return; }
+  games.slice(0, 5).forEach(function (g) {
+    var e = document.createElement("div"); e.className = "gr" + (g[2] ? " live" : "") + (games.length <= 2 ? " big" : "");
+    e.innerHTML = "<b></b><span></span>"; e.firstChild.textContent = g[0]; e.lastChild.textContent = g[1]; R.appendChild(e);
+  });
+}
+setInterval(function () { loadGames(false); }, 60000);
+$("games").onclick = openBoard;
+$("boardClose").onclick = function () { hide("board"); };
+function openBoard() {
+  var B = $("boardGrid"); B.innerHTML = '<div class="hint"></div>'; B.firstChild.textContent = T("Loading…");
+  show("board");
+  Promise.all(cfg.teams.map(function (t) {
+    var row = { n: t.n, sub: "", last: "", live: "", next: [] };
+    var a = getJSON(ESPN + t.s + "/" + t.l + "/teams/" + t.id).then(function (j) {
+      var tm = j.team || {}, rec = tm.record && tm.record.items && tm.record.items[0];
+      row.sub = [tm.standingSummary || "", rec ? rec.summary : ""].filter(Boolean).join("  ·  ");
+    }).catch(function () {});
+    var b = getJSON(ESPN + t.s + "/" + t.l + "/teams/" + t.id + "/schedule").then(function (j) {
+      (j.events || []).forEach(function (e) {
+        var comp = e.competitions[0], st = (comp.status || {}).type || {}, state = st.state || "pre", opp = "?", my = "", their = "", ha = "vs", won = false;
+        comp.competitors.forEach(function (c) {
+          if (String(c.id) === t.id || (c.team && String(c.team.id) === t.id)) { my = scoreOf(c); won = !!c.winner; ha = c.homeAway === "home" ? "vs" : "@"; }
+          else { opp = (c.team && c.team.abbreviation) || "?"; their = scoreOf(c); }
+        });
+        if (state === "post") row.last = (won ? T("W") : my === their ? T("D") : T("L")) + " " + my + "-" + their + "  " + ha + " " + opp;
+        else if (state === "in") row.live = my + "-" + their + "  " + ha + " " + opp + "  ·  " + (st.shortDetail || "");
+        else if (row.next.length < 3) row.next.push(whenStr(e.date, true) + "   " + ha + " " + opp);
+      });
+    }).catch(function () {});
+    return Promise.all([a, b]).then(function () { return row; });
+  })).then(function (rows) {
+    B.innerHTML = "";
+    rows.forEach(function (r) {
+      var c = document.createElement("div"); c.className = "bc";
+      var h = document.createElement("h3"); h.textContent = r.n; c.appendChild(h);
+      var s = document.createElement("div"); s.className = "s"; s.textContent = r.sub; c.appendChild(s);
+      if (r.live) { var lv = document.createElement("div"); lv.className = "l"; lv.innerHTML = "<i></i><div class=live></div>"; lv.firstChild.textContent = T("Live"); lv.lastChild.textContent = r.live; c.appendChild(lv); }
+      var ls = document.createElement("div"); ls.className = "l"; ls.innerHTML = "<i></i><div></div>"; ls.firstChild.textContent = T("Last"); ls.lastChild.textContent = r.last || "—"; c.appendChild(ls);
+      var nx = document.createElement("div"); nx.className = "l"; nx.innerHTML = "<i></i><div></div>"; nx.firstChild.textContent = T("Next");
+      if (!r.next.length) nx.lastChild.textContent = T("No game scheduled");
+      r.next.forEach(function (x) { var d = document.createElement("div"); d.textContent = x; nx.lastChild.appendChild(d); });
+      c.appendChild(nx); B.appendChild(c);
+    });
+    if (!rows.length) { B.innerHTML = '<div class="hint"></div>'; B.firstChild.textContent = T("Add teams in Settings › Sports teams"); }
+  });
+}
+
+// ---------- news ticker: world headlines in your language (refreshed every 30 min by a GitHub Action) ----------
+var NEWS_URL = "https://raw.githubusercontent.com/whitecoco20/wlh-glass-updates/news/";
+var news = [], newsIdx = 0, newsLang = -2, newsAt = 0, tickStart = 0;
+function loadNews(force) {
+  if (!cfg.news) { news = []; $("news").style.display = "none"; return; }
+  var lg = LANGS[Math.max(0, lang)];
+  if (!force && newsLang === lang && Date.now() - newsAt < 20 * 60000) return;
+  getJSON(NEWS_URL + lg + ".json").then(function (j) {
+    if (j.items && j.items.length) { news = j.items; newsIdx = 0; tickStart = 0; newsLang = lang; newsAt = Date.now(); $("news").style.display = "block"; }
+  }).catch(function () {});
+}
+function tickNews() {
+  if (!cfg.news || !news.length) return;
+  var now = Date.now(), tx = $("newsTx"), box = 490;
+  if (!tickStart) { tickStart = now; tx.textContent = news[newsIdx % news.length]; }
+  var travel = Math.max(0, tx.scrollWidth - box), scroll = travel / 85 * 1000, total = travel > 0 ? 3600 + scroll : 7000, el = now - tickStart;
+  if (el >= total) { newsIdx = (newsIdx + 1) % news.length; tickStart = now; el = 0; tx.textContent = news[newsIdx]; travel = Math.max(0, tx.scrollWidth - box); }
+  var off = travel <= 0 || el < 1800 ? 0 : Math.min(travel, (el - 1800) * 85 / 1000);
+  tx.style.transform = "translateX(" + (-off) + "px)";
+}
+(function loop() { tickNews(); requestAnimationFrame(loop); })();
+setInterval(function () { loadNews(false); }, 5 * 60000);
+
+// ---------- lock: the whole page needs a one-time key (signature over "WLHG1|" + this browser's ID) ----------
+var PREM = "https://wlhglass-prem.wilhoite-lux.workers.dev";
+var PREM_PUB = "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEq8+hd907H3S7Jtc46SI1Sa1i8uSZEW8ha8LPCvCcT1WEdvRdkA8vRCiV/ZKBwKi5xGcW4wnRCRAwjtsszrv9GA==";
+var webLocked = true;
+function lsGet(k) { try { return localStorage.getItem(k) || ""; } catch (e) { return ""; } }
+function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+function webId() {
+  var id = lsGet("wlhWebId");
+  if (!/^web-[0-9a-f]{16}$/.test(id) && !/^web-[A-Za-z0-9_-]{1,40}$/.test(id)) {
+    var b = new Uint8Array(8); crypto.getRandomValues(b);
+    id = "web-" + Array.prototype.map.call(b, function (x) { return ("0" + x.toString(16)).slice(-2); }).join(""); lsSet("wlhWebId", id);
+  }
+  return id;
+}
+function b64u(s) { s = s.replace(/-/g, "+").replace(/_/g, "/"); while (s.length % 4) s += "="; var r = atob(s), a = new Uint8Array(r.length); for (var i = 0; i < r.length; i++) a[i] = r.charCodeAt(i); return a; }
+function verifyKey(id, key) {
+  if (!key || !window.crypto || !crypto.subtle) return Promise.resolve(false);
+  var sig; try { sig = b64u(key); } catch (e) { return Promise.resolve(false); }
+  if (sig.length !== 64) return Promise.resolve(false);
+  return crypto.subtle.importKey("spki", b64u(PREM_PUB.replace(/=+$/, "")), { name: "ECDSA", namedCurve: "P-256" }, false, ["verify"])
+    .then(function (k) { return crypto.subtle.verify({ name: "ECDSA", hash: "SHA-256" }, k, sig, new TextEncoder().encode("WLHG1|" + id)); })
+    .catch(function () { return false; });
+}
+function webUnlock() { webLocked = false; $("pw").classList.add("off"); try { $("stage").inert = false; } catch (e) {} }
+window.addEventListener("hashchange", function () { if (webLocked && /unlock=/.test(location.hash)) location.reload(); });
+document.addEventListener("keydown", function (e) { if (webLocked) { e.stopImmediatePropagation(); } }, true);
+(function lock() {
+  try { $("stage").inert = true; } catch (e) {}
+  var m = location.hash.match(/unlock=(web-[A-Za-z0-9_-]{1,40})\.([A-Za-z0-9_-]{60,})/);
+  if (m) { lsSet("wlhWebId", m[1]); lsSet("wlhWebKey", m[2]); history.replaceState(null, "", location.pathname + location.search); }
+  var id = webId(), buy = PREM + "/buy?d=" + encodeURIComponent(id);
+  $("pwBuy").href = buy;
+  var q = QR.encode(buy), cv = $("pwQr"), g = cv.getContext("2d");
+  g.fillStyle = "#fff"; g.fillRect(0, 0, 460, 460);
+  if (q) { var cell = Math.floor(420 / q.size), off = Math.floor((460 - cell * q.size) / 2); g.fillStyle = "#0b0d1a";
+    for (var y = 0; y < q.size; y++) for (var x = 0; x < q.size; x++) if (q.mod[y][x]) g.fillRect(off + x * cell, off + y * cell, cell, cell); }
+  function poll() {
+    if (!webLocked) return;
+    fetch(PREM + "/key?d=" + encodeURIComponent(id), { cache: "no-store" }).then(function (r) { return r.json(); }).then(function (j) {
+      if (j.price) $("pwPrice").textContent = j.price;
+      if (j.key) return verifyKey(id, j.key).then(function (ok) { if (ok) { lsSet("wlhWebKey", j.key); webUnlock(); } });
+    }).catch(function () {}).then(function () { if (webLocked) setTimeout(poll, 4000); });
+  }
+  verifyKey(id, lsGet("wlhWebKey")).then(function (ok) { if (ok) webUnlock(); else poll(); });
+})();
+
+// ---------- start ----------
+importSetup();
+applyLang(); renderProf(); applyAccent(); fit(); renderLinks(); tick(); setInterval(tick, 1000 * 15);
+loadGames(true); loadNews(true);
+openDb(function () { loadPhotos(function () { applyBackground(); }); });
+loadWeather(); loadNet();
+setTimeout(function () { if (lang < 0) openLang(); else { var f = document.querySelector("#links .tile"); if (f) f.focus(); } }, 300);
+</script>
+</body>
+</html>

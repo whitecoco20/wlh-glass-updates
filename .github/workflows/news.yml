@@ -1,0 +1,25 @@
+name: News for WLH Glass Web
+# Every 30 minutes: world headlines in 13 languages -> the "news" branch (news/<lang>.json).
+on:
+  schedule:
+    - cron: "7,37 * * * *"
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["tools/news.py", ".github/workflows/news.yml"]
+permissions:
+  contents: write
+concurrency: news
+jobs:
+  news:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 tools/news.py
+      - name: Publish to the news branch (one commit, replaced each time)
+        run: |
+          cd out
+          git init -q -b news
+          git config user.name "github-actions"; git config user.email "github-actions@users.noreply.github.com"
+          git add -A && git commit -qm "News $(date -u +%FT%TZ)"
+          git push -qf "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" news

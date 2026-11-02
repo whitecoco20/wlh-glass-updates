@@ -1,0 +1,44 @@
+name: Publish release
+# Every time a new APK lands in releases/, publish it as a GitHub Release.
+# Release downloads are counted by GitHub (Insights isn't needed):
+#   gh api repos/whitecoco20/wlh-glass-updates/releases --jq '.[] | {tag: .tag_name, downloads: [.assets[].download_count] | add}'
+on:
+  push:
+    branches: [main]
+    paths: ["version.json", ".github/workflows/release.yml"]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Make sure the install counter exists
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # The app downloads stats/install.txt once per install. GitHub counts each download,
+          # so this release's download count = number of installs (2.7 and newer).
+          if ! gh release view stats >/dev/null 2>&1; then
+            echo "WLH Glass install counter" > install.txt
+            gh release create stats install.txt --prerelease --latest=false --title "Install counter" \
+              --notes "Each WLH Glass install (version 2.7 and newer) downloads install.txt once. Its download count is the number of installs. No personal data is sent."
+          fi
+      - name: Create release from version.json
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VER=$(jq -r .versionName version.json)
+          NOTES=$(jq -r .notes version.json)
+          APK="releases/wlh-glass-${VER}.apk"
+          test -f "$APK"
+          cp "$APK" wlh-glass.apk
+          if gh release view "v$VER" >/dev/null 2>&1; then
+            echo "Release v$VER already exists; leaving it (and its download count) alone."
+          else
+            gh release create "v$VER" wlh-glass.apk --title "WLH Glass $VER" --notes "$NOTES
+
+          Install on Google TV, Android TV or Fire TV: Downloader code 3985133.
+          Already installed: WLH Glass › Settings › App update." --latest
+          fi
