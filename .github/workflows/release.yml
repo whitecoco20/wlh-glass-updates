@@ -1,5 +1,5 @@
 name: Publish release
-# Every time a new APK lands in releases/, publish it as a GitHub Release.
+# Every time version.json changes, publish releases/wlh-glass-<version>.apk as a GitHub Release.
 # Release downloads are counted by GitHub (Insights isn't needed):
 #   gh api repos/whitecoco20/wlh-glass-updates/releases --jq '.[] | {tag: .tag_name, downloads: [.assets[].download_count] | add}'
 on:
