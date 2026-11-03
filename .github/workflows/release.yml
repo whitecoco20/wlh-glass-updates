@@ -19,7 +19,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # The app downloads stats/install.txt once per install. GitHub counts each download,
-          # so this release's download count = number of installs (2.7 and newer).
+          # so this release's download count = number of installs (2.7 and newer). Recreated on the clean main branch.
           if ! gh release view stats >/dev/null 2>&1; then
             echo "WLH Glass install counter" > install.txt
             gh release create stats install.txt --prerelease --latest=false --title "Install counter" \
