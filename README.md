@@ -62,6 +62,8 @@ When you open WLH Glass on a TV that isn't unlocked, it shows a QR code. Scan it
 
 After unlocking, the TV shows a second QR code with your **Downloader codes** and step-by-step install help for Fire TV and Google TV. That page opens one time only, so save the codes.
 
+After paying you also get a **license code** (WLH-XXXX-XXXX). If you reset or replace your TV, choose **Restore purchase** on the WLH Glass screen, scan the code and enter your license code and checkout email. A license can move to a new TV 2 times a year. See the [terms of sale](https://raw.githack.com/whitecoco20/wlh-glass-updates/main/docs/terms.html).
+
 ## WLH Glass Web (any browser)
 
 WLH Glass Web is also a $100 one-time unlock, per browser. The page shows a QR code and a Buy now button; it unlocks by itself after payment.
